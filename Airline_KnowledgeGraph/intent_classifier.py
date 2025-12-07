@@ -1,8 +1,6 @@
 from huggingface_hub import InferenceClient
 
-HF_TOKEN = ""
-
-client = InferenceClient(api_key=HF_TOKEN)
+client = InferenceClient(api_key=os.getenv("HF_TOKEN"))
 
 INTENT_SYSTEM_PROMPT = """
 You are an intent classification model for an airline knowledge graph system.
