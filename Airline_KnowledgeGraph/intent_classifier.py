@@ -10,33 +10,51 @@ if HF_TOKEN is None:
 # Initialize client
 client = InferenceClient(api_key=HF_TOKEN)
 
-INTENT_SYSTEM_PROMPT = """
-You are an intent classification model for an airline knowledge graph system.
+ENTITY_SYSTEM_PROMPT = """
+You are an entity extraction model for an airline knowledge graph.
 
-Your ONLY task is to return one intent label from this list:
+Your ONLY job is to return a VALID JSON dictionary.
+Do NOT output text before or after the JSON.
 
-- flight_search
-- delay_info
-- loyalty_miles
-- journey_stats
-- satisfaction_query
-- general_chat
+Extract:
+
+{
+  "flights": [...],
+  "airports": [...],
+  "passengers": [...],
+  "journeys": [...],
+  "routes": {
+       "origin": "...",
+       "destination": "..."
+  }
+}
 
 Rules:
-- Return EXACTLY one label from the list.
-- Do NOT explain your reasoning.
-- Do NOT answer conversationally.
-- If user mentions 'delay', always choose delay_info.
+- Return ONLY valid JSON.
+- No explanations.
+- No comments.
+- No markdown formatting.
 """
-
-def classify_intent_llm(text: str) -> str:
+def extract_entities_llm(text):
     completion = client.chat.completions.create(
         model="deepseek-ai/DeepSeek-V3.2:novita",
         messages=[
-            {"role": "system", "content": INTENT_SYSTEM_PROMPT},
+            {"role": "system", "content": ENTITY_SYSTEM_PROMPT},
             {"role": "user", "content": text}
         ],
-        max_tokens=5
     )
 
-    return completion.choices[0].message['content'].strip()
+    raw = completion.choices[0].message["content"].strip()
+    print("Raw LLM Output:", raw)
+
+    try:
+        return json.loads(raw)
+    except:
+        print("Failed to parse JSON. Returning fallback schema.")
+        return {
+            "flights": [],
+            "airports": [],
+            "passengers": [],
+            "journeys": [],
+            "routes": {"origin": None, "destination": None}
+        }
