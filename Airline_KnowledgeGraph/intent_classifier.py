@@ -37,7 +37,7 @@ Rules:
 """
 def extract_entities_llm(text):
     completion = client.chat.completions.create(
-        model="deepseek-ai/DeepSeek-V3.2:novita",
+        model="meta-llama/Meta-Llama-3.1-8B-Instruct",
         messages=[
             {"role": "system", "content": ENTITY_SYSTEM_PROMPT},
             {"role": "user", "content": text}
