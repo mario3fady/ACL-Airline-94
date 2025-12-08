@@ -1,16 +1,16 @@
 from neo4j import GraphDatabase
 import pandas as pd
-import configparser
+import os
 
 
-config = configparser.ConfigParser()
-config.read("config.txt")
+URI = os.environ.get("NEO4J_URI")
+USER = os.environ.get("USER_NAME")
+PASSWORD = os.environ.get("PASSWORD")
 
-URI = config["DEFAULT"]["URI"]
-USERNAME = config["DEFAULT"]["USERNAME"]
-PASSWORD = config["DEFAULT"]["PASSWORD"]
-
-driver = GraphDatabase.driver(URI, auth=(USERNAME, PASSWORD))
+driver = GraphDatabase.driver(
+    os.environ["NEO4J_URI"],
+    auth=(os.environ["USER_NAME"], os.environ["PASSWORD"])
+)
 
 
 df = pd.read_csv("Airline_surveys_sample.csv")

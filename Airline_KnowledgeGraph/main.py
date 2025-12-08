@@ -1,5 +1,6 @@
 from router import answer_question
 
+
 print("🛫 Airline KG Assistant — Baseline Mode")
 print("Type 'exit' to quit.\n")
 

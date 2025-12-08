@@ -11,11 +11,20 @@ def format_kg_result(intent, records):
     Safely handles missing keys and invalid record types.
     """
 
-    # If empty or invalid
+    if intent == "embedding_similarity":
+        lines = ["Here are journeys most similar to your request:\n"]
+        for r in records:
+            lines.append(
+                f"- Journey {r.get('journey')} | Delay: {r.get('delay')} | "
+                f"Food Score: {r.get('food')} | Similarity Score: {r.get('score'):.4f}"
+            )
+        return "\n".join(lines)
+    
+    # Empty or invalid
     if not records or isinstance(records, dict):
         return "No matching results found in the knowledge graph."
 
-    # Keep only dict-like rows
+    # Keep only dict rows
     safe_records = [r for r in records if isinstance(r, dict)]
     if not safe_records:
         return "No structured data returned from the knowledge graph."
@@ -26,7 +35,7 @@ def format_kg_result(intent, records):
         for r in safe_records:
             lines.append(
                 f"- Flight {r.get('flight')} from {r.get('origin')} to {r.get('destination')} "
-                f"has a delay of {r.get('delay')} minutes and a food score of {r.get('food_score')}."
+                f"had a delay of {r.get('delay')} minutes and a food score of {r.get('food_score')}."
             )
         return "\n".join(lines)
 
@@ -91,7 +100,7 @@ def format_kg_result(intent, records):
             )
         return "\n".join(lines)
 
-    # DEFAULT FALLBACK
+    # DEFAULT
     return str(records)
 
 
@@ -108,43 +117,26 @@ class Retriever:
 
     # ---------------- CYPHER EXECUTION ----------------
     def run_query(self, query_key, params=None):
-        """
-        Execute a Cypher query identified by query_key with parameter dict `params`.
-        Returns a list of dicts (records).
-        """
         query = QUERIES.get(query_key)
-
         if query is None:
             return {"error": f"Unknown query: {query_key}"}
 
         if params is None:
             params = {}
 
-        # Debug logging
-        print("\n--- EXECUTING CYPHER QUERY ---")
-        print("Query Key:", query_key)
-        print("Cypher:", query)
-        print("Parameters:", params)
-
         try:
             with self.driver.session() as session:
                 result = session.run(query, params)
-                data = [r.data() for r in result]
-
-            print("Query Output:", data)
-            return data
-
+                return [r.data() for r in result]
         except Exception as e:
-            print("❌ CYPHER ERROR:", e)
             return {"error": str(e)}
 
     # ---------------- INTENT → QUERY ROUTING ----------------
     def route(self, intent, entities):
         """
-        Map (intent + extracted entities) -> (query_key, params)
+        Convert (intent + extracted entities) → (query_key, params)
         """
 
-        flights = entities.get("flights", [])
         airports = entities.get("airports", [])
         routes = entities.get("routes", {}) or {}
         passengers = entities.get("passengers", [])
@@ -159,7 +151,7 @@ class Retriever:
             dest = routes.get("destination") or (airports[1] if len(airports) > 1 else "")
 
             if not origin or not dest:
-                print("⚠ Missing origin/destination for flight_search")
+                print("⚠ Missing origin/destination → flight_search aborted")
                 return None, {}
 
             return "flight_search", {"origin": origin, "destination": dest}
@@ -172,7 +164,7 @@ class Retriever:
         if intent == "loyalty_miles":
             level = passengers[0] if passengers else ""
             if not level:
-                print("⚠ Loyalty level missing for loyalty_miles")
+                print("⚠ Missing loyalty level")
                 return None, {}
             return "loyalty_miles", {"level": level}
 
@@ -184,5 +176,37 @@ class Retriever:
         if intent == "satisfaction_query":
             return "satisfaction_query", {}
 
-        # ---------- GENERAL CHAT OR UNKNOWN ----------
+        # Unknown intent
         return None, {}
+
+    # ---------------- MAIN RETRIEVAL METHOD ----------------
+    def retrieve(self, intent, entities):
+        """
+        High-level method:
+           - Route intent → query_key + params
+           - Run Cypher
+           - Format result into human text
+        """
+        query_key, params = self.route(intent, entities)
+
+        if query_key is None:
+            return {
+                "error": "Unable to determine query from intent/entities."
+            }
+
+        raw = self.run_query(query_key, params)
+
+        # If Cypher error
+        if isinstance(raw, dict) and "error" in raw:
+            return raw
+
+        answer_text = format_kg_result(intent, raw)
+
+        return {
+            "intent": intent,
+            "entities": entities,
+            "query_key": query_key,
+            "params": params,
+            "kg_result": raw,
+            "answer_text": answer_text
+        }
