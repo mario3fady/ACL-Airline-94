@@ -1,11 +1,8 @@
 from intent_classifier import classify_intent_llm
 from entity_extraction import extract_entities_llm
-from retrieval import Retriever
+from retrieval import Retriever, format_kg_result
 import configparser
 
-# -----------------------------
-# Load Neo4j credentials
-# -----------------------------
 config = configparser.ConfigParser()
 config.read("config.txt")
 
@@ -40,14 +37,17 @@ def answer_question(user_query: str):
             "error": "I could not determine the correct KG query for your request.",
         }
 
-    # 4. Execute query
-    kg_result = retriever.run_query(query_key, params)
+    # 4. Execute Neo4j query → raw records (list of dict)
+    kg_records = retriever.run_query(query_key, params)
 
-    # 5. Return a structured response (you can format this however you like)
+    # 5. Build human-readable answer text
+    answer_text = format_kg_result(intent, kg_records)
+
     return {
         "intent": intent,
         "entities": entities,
         "query_key": query_key,
         "params": params,
-        "kg_result": kg_result,
+        "kg_result": kg_records,   # raw data
+        "answer_text": answer_text # pretty text
     }

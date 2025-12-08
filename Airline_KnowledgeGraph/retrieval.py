@@ -2,6 +2,102 @@ from neo4j import GraphDatabase
 from queries import QUERIES
 
 
+# ---------------------------------------------------
+# FORMATTER: Convert KG raw data → human readable text
+# ---------------------------------------------------
+def format_kg_result(intent, records):
+    """
+    Convert raw Neo4j result list into clean human-readable text.
+    Safely handles missing keys and invalid record types.
+    """
+
+    # If empty or invalid
+    if not records or isinstance(records, dict):
+        return "No matching results found in the knowledge graph."
+
+    # Keep only dict-like rows
+    safe_records = [r for r in records if isinstance(r, dict)]
+    if not safe_records:
+        return "No structured data returned from the knowledge graph."
+
+    # ---------------- FLIGHT SEARCH ----------------
+    if intent == "flight_search":
+        lines = ["Here are the flights found:\n"]
+        for r in safe_records:
+            lines.append(
+                f"- Flight {r.get('flight')} from {r.get('origin')} to {r.get('destination')} "
+                f"has a delay of {r.get('delay')} minutes and a food score of {r.get('food_score')}."
+            )
+        return "\n".join(lines)
+
+    # ---------------- DELAY INFO ----------------
+    if intent == "delay_info":
+        lines = ["Worst delayed flights:\n"]
+        for r in safe_records:
+            lines.append(
+                f"- Flight {r.get('flight')} had a delay of {r.get('delay')} minutes."
+            )
+        return "\n".join(lines)
+
+    # ---------------- SATISFACTION QUERY ----------------
+    if intent == "satisfaction_query":
+        lines = ["Flights with top food satisfaction scores:\n"]
+        for r in safe_records:
+            lines.append(
+                f"- Flight {r.get('flight')} has a food satisfaction score of {r.get('food_score')}."
+            )
+        return "\n".join(lines)
+
+    # ---------------- JOURNEY STATS ----------------
+    if intent == "journey_stats":
+        lines = ["Journey statistics per flight:\n"]
+        for r in safe_records:
+            lines.append(
+                f"- Flight {r.get('flight')}: "
+                f"Avg Delay = {r.get('avg_delay')} min | "
+                f"Avg Food Score = {r.get('avg_food')} | "
+                f"Journeys Count = {r.get('journey_count')}."
+            )
+        return "\n".join(lines)
+
+    # ---------------- PASSENGER JOURNEYS ----------------
+    if intent == "passenger_journeys":
+        lines = ["Passenger journey history:\n"]
+        for r in safe_records:
+            lines.append(
+                f"- Journey {r.get('journey')}: delay = {r.get('delay')} minutes, "
+                f"food score = {r.get('food_score')}."
+            )
+        return "\n".join(lines)
+
+    # ---------------- CLASS SEARCH ----------------
+    if intent == "class_search":
+        lines = ["Journeys for passengers in this class:\n"]
+        for r in safe_records:
+            lines.append(
+                f"- Journey {r.get('journey')} (Class: {r.get('class')}), "
+                f"Delay = {r.get('delay')} minutes."
+            )
+        return "\n".join(lines)
+
+    # ---------------- LOYALTY MILES ----------------
+    if intent == "loyalty_miles":
+        lines = ["Loyalty miles summary:\n"]
+        for r in safe_records:
+            lines.append(
+                f"- Loyalty Level: {r.get('level')}\n"
+                f"  Total Miles: {r.get('total_miles')}\n"
+                f"  Journeys Taken: {r.get('journey_count')}"
+            )
+        return "\n".join(lines)
+
+    # DEFAULT FALLBACK
+    return str(records)
+
+
+# ---------------------------------------------------
+#                RETRIEVER CLASS
+# ---------------------------------------------------
 class Retriever:
 
     def __init__(self, uri, user, password):
@@ -12,6 +108,10 @@ class Retriever:
 
     # ---------------- CYPHER EXECUTION ----------------
     def run_query(self, query_key, params=None):
+        """
+        Execute a Cypher query identified by query_key with parameter dict `params`.
+        Returns a list of dicts (records).
+        """
         query = QUERIES.get(query_key)
 
         if query is None:
@@ -42,19 +142,8 @@ class Retriever:
     def route(self, intent, entities):
         """
         Map (intent + extracted entities) -> (query_key, params)
-        entities format (from entity_extraction.py):
-
-        {
-          "flights": [],
-          "airports": [],
-          "passengers": [],
-          "journeys": [],
-          "routes": {
-              "origin": "",
-              "destination": ""
-          }
-        }
         """
+
         flights = entities.get("flights", [])
         airports = entities.get("airports", [])
         routes = entities.get("routes", {}) or {}
@@ -66,7 +155,6 @@ class Retriever:
 
         # ---------- FLIGHT SEARCH ----------
         if intent == "flight_search":
-            # Prefer structured routes, fall back to airport list
             origin = routes.get("origin") or (airports[0] if len(airports) > 0 else "")
             dest = routes.get("destination") or (airports[1] if len(airports) > 1 else "")
 
@@ -78,12 +166,10 @@ class Retriever:
 
         # ---------- DELAY INFO ----------
         if intent == "delay_info":
-            # "Which flights have the worst delays?"
             return "delay_info", {}
 
         # ---------- LOYALTY MILES ----------
         if intent == "loyalty_miles":
-            # passengers list holds loyalty/program mentions (e.g., ["premier silver"])
             level = passengers[0] if passengers else ""
             if not level:
                 print("⚠ Loyalty level missing for loyalty_miles")
