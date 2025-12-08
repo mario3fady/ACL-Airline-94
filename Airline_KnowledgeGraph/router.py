@@ -3,7 +3,6 @@ from entity_extraction import extract_entities_llm
 from retrieval import Retriever
 import configparser
 
-
 # -----------------------------
 # Load Neo4j credentials
 # -----------------------------
@@ -16,33 +15,39 @@ retriever = Retriever(
     config["DEFAULT"]["PASSWORD"],
 )
 
-
-# -----------------------------
-# Main QA Pipeline
-# -----------------------------
-def answer_question(question):
-
+def answer_question(user_query: str):
     # 1. Intent classification
-    intent = classify_intent_llm(question)
+    intent = classify_intent_llm(user_query)
+    print("\n--- INTENT ---")
+    print(intent)
 
     # 2. Entity extraction
-    entities = extract_entities_llm(question)
+    entities = extract_entities_llm(user_query)
+    print("\n--- ENTITIES ---")
+    print(entities)
 
-    print("Intent:", intent)
-    print("Entities:", entities)
-
-    # 3. Routing → Select Cypher Query + Parameters
+    # 3. Route to correct query + parameters
     query_key, params = retriever.route(intent, entities)
 
+    print("\n--- ROUTER DECISION ---")
     print("Selected Query:", query_key)
     print("Parameters:", params)
 
-    # --- Handle missing query (e.g., no origin/destination provided) ---
     if query_key is None:
-        return {"error": "I could not determine the correct query for your request."}
+        return {
+            "intent": intent,
+            "entities": entities,
+            "error": "I could not determine the correct KG query for your request.",
+        }
 
     # 4. Execute query
-    result = retriever.run_query(query_key, params)
+    kg_result = retriever.run_query(query_key, params)
 
-    # 5. Return KG result
-    return result
+    # 5. Return a structured response (you can format this however you like)
+    return {
+        "intent": intent,
+        "entities": entities,
+        "query_key": query_key,
+        "params": params,
+        "kg_result": kg_result,
+    }
