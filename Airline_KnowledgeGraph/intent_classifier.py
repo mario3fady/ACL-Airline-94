@@ -1,60 +1,32 @@
 import os
 from huggingface_hub import InferenceClient
 
-# Load API key from environment variable
 HF_TOKEN = os.environ.get("HF_TOKEN")
-
 if HF_TOKEN is None:
-    raise ValueError("❌ HF_TOKEN environment variable is not set. Please run: setx HF_TOKEN \"your_token_here\"")
+    raise ValueError("❌ HF_TOKEN not set.")
 
-# Initialize client
+MODEL_NAME = "google/gemma-2-2b-it"  # <--- FIXED MODEL
+
 client = InferenceClient(api_key=HF_TOKEN)
 
-ENTITY_SYSTEM_PROMPT = """
-You are an entity extraction model for an airline knowledge graph.
+INTENT_SYSTEM_PROMPT = """
+You are an intent classifier for an airline knowledge graph.
+Return EXACTLY ONE label:
 
-Your ONLY job is to return a VALID JSON dictionary.
-Do NOT output text before or after the JSON.
-
-Extract:
-
-{
-  "flights": [...],
-  "airports": [...],
-  "passengers": [...],
-  "journeys": [...],
-  "routes": {
-       "origin": "...",
-       "destination": "..."
-  }
-}
-
-Rules:
-- Return ONLY valid JSON.
-- No explanations.
-- No comments.
-- No markdown formatting.
+- flight_search
+- delay_info
+- loyalty_miles
+- journey_stats
+- satisfaction_query
+- general_chat
 """
-def extract_entities_llm(text):
-    completion = client.chat.completions.create(
-        model="deepseek-ai/DeepSeek-V3.2:novita",
+
+def classify_intent_llm(text):
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
         messages=[
-            {"role": "system", "content": ENTITY_SYSTEM_PROMPT},
+            {"role": "system", "content": INTENT_SYSTEM_PROMPT},
             {"role": "user", "content": text}
-        ],
+        ]
     )
-
-    raw = completion.choices[0].message["content"].strip()
-    print("Raw LLM Output:", raw)
-
-    try:
-        return json.loads(raw)
-    except:
-        print("Failed to parse JSON. Returning fallback schema.")
-        return {
-            "flights": [],
-            "airports": [],
-            "passengers": [],
-            "journeys": [],
-            "routes": {"origin": None, "destination": None}
-        }
+    return response.choices[0].message["content"].strip()

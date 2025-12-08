@@ -6,7 +6,7 @@ client = InferenceClient(
 )
 
 completion = client.chat.completions.create(
-    model="deepseek-ai/DeepSeek-V3.2:novita",
+    model="deepseek-ai/DeepSeek-V3.2",
     messages=[
         {
             "role": "user",
