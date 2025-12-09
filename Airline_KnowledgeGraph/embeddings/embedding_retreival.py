@@ -32,6 +32,10 @@ def embed_query(text: str):
     legs = 1 if "legs" in text or "connections" in text else 0
 
     vec = np.array([food, delay, miles, legs], dtype=float)
+    # FIX: avoid zero vector (invalid for Neo4j)
+    if np.sum(vec) == 0:
+        vec = np.array([1.0, 1.0, 1.0, 1.0], dtype=float)
+        
     norm = np.linalg.norm(vec)
     return (vec / norm).tolist() if norm != 0 else vec.tolist()
 
@@ -42,16 +46,16 @@ def query_similar_journeys(query_vec, top_k=5):
             """
             CALL db.index.vector.queryNodes(
                 'journey_embedding_index',
-                $vec,
-                $k
+                $k,
+                $vec
             ) YIELD node, score
             RETURN node.feedback_ID AS journey,
                    node.arrival_delay_minutes AS delay,
                    node.food_satisfaction_score AS food,
                    score
             """,
-            vec=query_vec,
-            k=top_k
+            k=int(top_k),
+            vec=[float(x) for x in query_vec]
         )
         return results.data()
 

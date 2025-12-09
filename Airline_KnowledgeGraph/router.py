@@ -31,30 +31,10 @@ def answer_question(user_query: str):
     print("\n--- ENTITIES ---")
     print(entities)
 
-    # 3. Route to correct query + parameters
-    query_key, params = retriever.route(intent, entities)
+    # 3. Hybrid KG Retrieval (baseline + embeddings)
+    context = retriever.retrieve(intent, entities, use_embeddings=True)
 
-    print("\n--- ROUTER DECISION ---")
-    print("Selected Query:", query_key)
-    print("Parameters:", params)
+    print("\n--- HYBRID CONTEXT ---")
+    print(context)
 
-    if query_key is None:
-        return {
-            "intent": intent,
-            "entities": entities,
-            "error": "I could not determine the correct KG query for your request.",
-        }
-
-    # 4. Execute query
-    kg_result = retriever.run_query(query_key, params)
-
-    # 5. Return a structured response (you can format this however you like)
-    formatted = format_kg_result(intent, kg_result)
-    return {
-    "intent": intent,
-    "entities": entities,
-    "query_key": query_key,
-    "params": params,
-    "kg_result": kg_result,      # still include raw data for debugging
-    "answer_text": formatted     # final pretty text
-}
+    return context

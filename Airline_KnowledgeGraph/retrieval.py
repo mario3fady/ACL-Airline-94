@@ -1,6 +1,69 @@
 from neo4j import GraphDatabase
 from queries import QUERIES
 
+from embeddings.embedding_retreival import get_similar_journeys
+
+
+def merge_results(baseline_list, embedding_list, key="journey"):
+    """
+    Merge baseline Cypher results and embedding-based results:
+    - Convert everything to consistent dictionaries
+    - Remove duplicates by `key` (default: journey/feedback_ID)
+    - Return merged sorted by embedding score (if available)
+    """
+
+    if baseline_list is None:
+        baseline_list = []
+
+    if embedding_list is None:
+        embedding_list = []
+
+    # Standardize baseline: ensure all records have a "journey" or "flight" key
+    cleaned_baseline = []
+    for r in baseline_list:
+        r_fixed = dict(r)
+
+        # Make sure every record has a unique ID field
+        if "journey" not in r_fixed:
+            # Some queries return flight_number; embed-based returns journey ID
+            r_fixed["journey"] = r_fixed.get("journey") or r_fixed.get("flight") or None
+
+        # No embedding score here
+        r_fixed["score"] = None
+        cleaned_baseline.append(r_fixed)
+
+    # Clean embedding results (they already contain journey + score)
+    cleaned_embedding = []
+    for r in embedding_list:
+        cleaned_embedding.append({
+            "journey": r.get("journey"),
+            "delay": r.get("delay"),
+            "food": r.get("food"),
+            "score": r.get("score")
+        })
+
+    # Deduplicate using a dictionary keyed by journey ID
+    merged = {}
+    for r in cleaned_baseline:
+        jid = r.get("journey")
+        if jid not in merged:
+            merged[jid] = r
+
+    for r in cleaned_embedding:
+        jid = r.get("journey")
+        if jid not in merged:
+            merged[jid] = r
+        else:
+            # If exists, update with embedding score
+            merged[jid]["score"] = r.get("score")
+
+    # Convert back to list
+    merged_list = list(merged.values())
+
+    # Sort by embedding similarity when available
+    merged_list.sort(key=lambda x: (x["score"] is None, x["score"]), reverse=False)
+
+    return merged_list
 
 # ---------------------------------------------------
 # FORMATTER: Convert KG raw data → human readable text
@@ -180,33 +243,38 @@ class Retriever:
         return None, {}
 
     # ---------------- MAIN RETRIEVAL METHOD ----------------
-    def retrieve(self, intent, entities):
-        """
-        High-level method:
-           - Route intent → query_key + params
-           - Run Cypher
-           - Format result into human text
-        """
+    def retrieve(self, intent, entities, use_embeddings=True):
+        # 1. Baseline routing
         query_key, params = self.route(intent, entities)
 
         if query_key is None:
-            return {
-                "error": "Unable to determine query from intent/entities."
-            }
+            return {"error": "Unable to determine query from intent/entities."}
 
-        raw = self.run_query(query_key, params)
+        # 2. Run baseline Cypher
+        baseline_result = self.run_query(query_key, params)
 
-        # If Cypher error
-        if isinstance(raw, dict) and "error" in raw:
-            return raw
+        # 3. Run embedding retrieval (optional)
+        embedding_result = []
+        if use_embeddings:
+            embedding_result = get_similar_journeys(
+                intent + " " + " ".join(entities.get("airports", []))
+            )
+        # 4. Merge results
+        merged = merge_results(baseline_result, embedding_result)
 
-        answer_text = format_kg_result(intent, raw)
-
-        return {
+        # 5. Build unified context for LLM
+        context = {
             "intent": intent,
             "entities": entities,
             "query_key": query_key,
             "params": params,
-            "kg_result": raw,
-            "answer_text": answer_text
+            "baseline": baseline_result,
+            "embeddings": embedding_result,
+            "merged": merged,
+            "metadata": {
+                "baseline_count": len(baseline_result) if isinstance(baseline_result, list) else 0,
+                "embedding_count": len(embedding_result)
+            }
         }
+
+        return context
