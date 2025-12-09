@@ -2,7 +2,9 @@ from intent_classifier import classify_intent_llm
 from entity_extraction import extract_entities_llm
 from retrieval import Retriever
 import configparser
-from retrieval import format_kg_result
+from prompt_builder import build_structured_prompt
+from llm_wrapper import run_llm
+
 import os
 # -----------------------------
 # Load Neo4j credentials
@@ -35,6 +37,13 @@ def answer_question(user_query: str):
     context = retriever.retrieve(intent, entities, use_embeddings=True)
 
     print("\n--- HYBRID CONTEXT ---")
-    print(context)
+    prompt = build_structured_prompt(user_query, context)
+    llm_answer = run_llm(prompt)
 
-    return context
+    return {
+        "intent": intent,
+        "entities": entities,
+        "context": context,
+        "prompt_used": prompt,
+        "final_answer": llm_answer
+    }
