@@ -149,41 +149,51 @@ if st.session_state.page == "chat":
 
     if st.button("Send"):
         if user_msg.strip() != "":
-            # Add user message
+            # Add user message to chat
             st.session_state.chat_history.append({"role": "user", "content": user_msg})
 
-            # Simulated backend response (replace later)
-            fake_response = {
-                "intent": "flight_search",
-                "entities": {"origin": "Cairo", "destination": "Dubai"},
-                "cypher_query": "MATCH (f:Flight)...",
-                "kg_context": {
-                    "nodes": ["Flight123", "Airport_CAI", "Airport_DXB"],
-                    "relationships": ["DEPARTS_FROM", "ARRIVES_TO"]
-                },
-                "llm_answer": "There are 5 flights today from Cairo to Dubai with minimal delays."
-            }
+            # ---------------------------
+            # REAL BACKEND CALL
+            # ---------------------------
+            try:
+                from router import answer_question
+                backend_response = answer_question(user_msg)
 
-            # Add assistant response
+            except Exception as e:
+                backend_response = {
+                    "intent": "error",
+                    "entities": {},
+                    "query_key": None,
+                    "params": {},
+                    "kg_result": {},
+                    "answer_text": f"Backend error: {str(e)}"
+                }
+
+            # Add assistant message
             st.session_state.chat_history.append({
                 "role": "assistant",
-                "content": fake_response["llm_answer"]
+                "content": backend_response.get("answer_text", "No answer")
             })
 
-            # System information sections
+            # ---------------------------
+            # UI DISPLAY SECTIONS
+            # ---------------------------
             st.subheader("🧠 Detected Intent")
-            st.write(fake_response["intent"])
+            st.write(backend_response.get("intent", "N/A"))
 
             st.subheader("🏷️ Extracted Entities")
-            st.json(fake_response["entities"])
+            st.json(backend_response.get("entities", {}))
 
-            with st.expander("📄 Cypher Query Executed"):
-                st.code(fake_response["cypher_query"], language="cypher")
+            st.subheader("⚡ Selected Query")
+            st.write(backend_response.get("query_key", "None"))
 
-            st.subheader("🗂️ KG Retrieved Context")
-            st.json(fake_response["kg_context"])
+            with st.expander("📄 Query Parameters"):
+                st.json(backend_response.get("params", {}))
+
+            with st.expander("🗂️ Raw KG Results"):
+                st.json(backend_response.get("kg_result", {}))
 
             st.subheader("🤖 Final Answer")
-            st.write(fake_response["llm_answer"])
+            st.write(backend_response.get("answer_text", ""))
 
             st.rerun()
