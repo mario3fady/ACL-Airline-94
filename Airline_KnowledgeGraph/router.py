@@ -4,7 +4,7 @@ from retrieval import Retriever
 import configparser
 from prompt_builder import build_structured_prompt
 from llm_wrapper import run_llm
-
+from llm_models import run_all_llm
 import os
 # -----------------------------
 # Load Neo4j credentials
@@ -36,14 +36,33 @@ def answer_question(user_query: str):
     # 3. Hybrid KG Retrieval (baseline + embeddings)
     context = retriever.retrieve(intent, entities, use_embeddings=True)
 
-    print("\n--- HYBRID CONTEXT ---")
+    # print("\n--- HYBRID CONTEXT ---")
+    # prompt = build_structured_prompt(user_query, context)
+    # llm_answer = run_llm(prompt)
+
+    # return {
+    #     "intent": intent,
+    #     "entities": entities,
+    #     "context": context,
+    #     "prompt_used": prompt,
+    #     "final_answer": llm_answer
+    # }
+
+        # 4. Build structured LLM prompt
     prompt = build_structured_prompt(user_query, context)
-    llm_answer = run_llm(prompt)
+
+    # 5. Run all three LLMs for comparison
+    model_results = {
+        "deepseek": run_all_llm("deepseek", prompt),
+        "gemma": run_all_llm("gemma", prompt),
+        "llama": run_all_llm("llama", prompt)
+    }
 
     return {
         "intent": intent,
         "entities": entities,
         "context": context,
         "prompt_used": prompt,
-        "final_answer": llm_answer
+        "model_comparison": model_results
     }
+
