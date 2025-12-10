@@ -12,7 +12,7 @@ QUERIES = {
                d.station_code AS destination,
                j.arrival_delay_minutes AS delay,
                j.food_satisfaction_score AS food_score
-        LIMIT 20
+        LIMIT 5
     """,
 
     # 2. Delay info – "Which flights have the worst delays?"
@@ -21,7 +21,7 @@ QUERIES = {
         RETURN f.flight_number AS flight,
                j.arrival_delay_minutes AS delay
         ORDER BY delay DESC
-        LIMIT 10
+        LIMIT 5
     """,
 
     # 3. Satisfaction query – best food satisfaction
@@ -30,7 +30,7 @@ QUERIES = {
         RETURN f.flight_number AS flight,
                j.food_satisfaction_score AS food_score
         ORDER BY food_score DESC
-        LIMIT 20
+        LIMIT 5
     """,
 
     # 4. Journey stats – aggregate delay & satisfaction per flight
@@ -40,7 +40,7 @@ QUERIES = {
                AVG(j.arrival_delay_minutes) AS avg_delay,
                AVG(j.food_satisfaction_score) AS avg_food,
                COUNT(j) AS journey_count
-        LIMIT 50
+        LIMIT 5
     """,
 
     # 5. Passenger journeys by record locator
@@ -49,6 +49,7 @@ QUERIES = {
         RETURN j.feedback_ID AS journey,
                j.arrival_delay_minutes AS delay,
                j.food_satisfaction_score AS food_score
+        LIMIT 5
     """,
 
     # 6. Class search – journeys filtered by passenger class
@@ -58,6 +59,7 @@ QUERIES = {
         RETURN j.feedback_ID AS journey,
                j.passenger_class AS class,
                j.arrival_delay_minutes AS delay
+        LIMIT 5
     """,
 
     # 7. Loyalty miles – total miles flown by passengers at a loyalty level
@@ -66,5 +68,6 @@ QUERIES = {
         RETURN p.loyalty_program_level AS level,
                SUM(j.actual_flown_miles) AS total_miles,
                COUNT(j) AS journey_count
+        LIMIT 5
     """
 }
