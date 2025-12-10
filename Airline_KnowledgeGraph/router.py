@@ -3,8 +3,7 @@ from entity_extraction import extract_entities_llm
 from retrieval import Retriever
 import configparser
 from prompt_builder import build_structured_prompt
-from llm_wrapper import run_llm
-from llm_models import run_all_llm
+from llm_models import run_llm
 import os
 # -----------------------------
 # Load Neo4j credentials
@@ -53,9 +52,9 @@ def answer_question(user_query: str):
 
     # 5. Run all three LLMs for comparison
     model_results = {
-        "deepseek": run_all_llm("deepseek", prompt),
-        "gemma": run_all_llm("gemma", prompt),
-        "llama": run_all_llm("llama", prompt)
+        "deepseek": run_llm("deepseek", prompt),
+        "gemma": run_llm("gemma", prompt),
+        "llama": run_llm("llama", prompt)
     }
 
     return {

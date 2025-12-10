@@ -20,7 +20,7 @@ AVAILABLE_MODELS = {
 # -----------------------------------------------
 # UNIFIED LLM CALL FUNCTION
 # -----------------------------------------------
-def run_all_llm(model_name, prompt, max_tokens=500):
+def run_llm(model_name, prompt, max_tokens=500):
     if model_name not in AVAILABLE_MODELS:
         raise ValueError(f"Unknown model: {model_name}")
 
