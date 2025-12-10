@@ -1,60 +1,120 @@
-import json
 import os
 from huggingface_hub import InferenceClient
+
+# ------------------------------------------------------------------
+# Environment & Model Setup
+# ------------------------------------------------------------------
 
 HF_TOKEN = os.environ.get("HF_TOKEN")
 if HF_TOKEN is None:
     raise ValueError("❌ HF_TOKEN not set.")
 
-MODEL_NAME = "deepseek-ai/DeepSeek-V3.2"  # <--- FIXED MODEL
-
+MODEL_NAME = "deepseek-ai/DeepSeek-V3.2"
 client = InferenceClient(api_key=HF_TOKEN)
+
+# ------------------------------------------------------------------
+# System Prompt for Intent Classification
+# ------------------------------------------------------------------
 
 INTENT_SYSTEM_PROMPT = """
 You are an Intent Classification Model for an Airline Knowledge Graph System.
 
-Your task is to read the user's natural-language query and classify it into EXACTLY ONE intent label from the list below:
+Your task is to read the user's natural-language query and classify it into
+EXACTLY ONE intent label from the list below.
 
 INTENT LABELS:
-- flight_search        → questions about routes, flights, origins, destinations.
-- delay_info           → questions about delays, lateness, cancellations, on-time performance.
-- loyalty_miles        → questions about miles flown, loyalty levels, total distance, passenger mileage.
-- journey_stats        → questions about number of legs, multi-leg trips, journey summaries.
-- satisfaction_query   → questions about food scores, satisfaction ratings, overall scores.
-- general_chat         → greetings, chit-chat, unrelated conversation.
 
-REQUIREMENTS:
-- Output ONLY the label text (e.g., "flight_search").
-- Do NOT explain.
-- Do NOT output extra words.
-- If multiple intents appear, choose the PRIMARY one.
-- If the query includes the word "delay", ALWAYS classify as delay_info.
-- If the query is unclear, choose general_chat.
+- flight_search
+  → routes, origins, destinations, specific flights
+
+- delay_info
+  → delays, lateness, worst flights, late arrivals
+
+- airport_delay
+  → delays by airport or station
+
+- route_satisfaction
+  → best or worst routes by satisfaction or experience
+
+- class_delay
+  → delays by passenger class
+
+- class_satisfaction
+  → satisfaction by passenger class
+
+- fleet_performance
+  → aircraft, fleet, or plane type comparisons
+
+- high_risk_passengers
+  → unhappy passengers, churn risk, bad experience patterns
+
+- frequent_flyers
+  → most frequent travelers or most journeys
+
+- generation_analysis
+  → comparisons by passenger generation
+
+- loyalty_miles
+  → miles flown, loyalty level analysis
+
+- journey_stats
+  → journey counts, number of legs, summaries
+
+- satisfaction_query
+  → food or service satisfaction scores
+
+- general_chat
+  → greetings or unrelated conversation
+
+CLASSIFICATION RULES:
+
+1. Output EXACTLY ONE label, no extra text.
+2. If the word "delay" appears:
+   - Choose the MOST SPECIFIC delay intent available.
+3. If the query mentions an airport explicitly with delay:
+   - Use airport_delay.
+4. If the query mentions passenger class with delay:
+   - Use class_delay.
+5. If the query is unclear or unrelated:
+   - Use general_chat.
+6. If multiple intents appear:
+   - Choose the PRIMARY one.
 
 EXAMPLES:
-USER: "Show me flights from LAX to IAX"  
+
+USER: "Show me flights from LAX to IAX"
 OUTPUT: flight_search
 
-USER: "Which flights arrive late most often?"  
-OUTPUT: delay_info
+USER: "Which airport has the worst delays?"
+OUTPUT: airport_delay
 
-USER: "How many miles did premier silver members earn?"  
-OUTPUT: loyalty_miles
+USER: "Which class is delayed the most?"
+OUTPUT: class_delay
 
-USER: "How many legs did my journey have?"  
-OUTPUT: journey_stats
+USER: "Which aircraft performs best?"
+OUTPUT: fleet_performance
 
-USER: "What is my satisfaction score?"  
-OUTPUT: satisfaction_query
+USER: "Who are the most frequent travelers?"
+OUTPUT: frequent_flyers
 
-USER: "Hi, how are you?"  
+USER: "How satisfied are economy passengers?"
+OUTPUT: class_satisfaction
+
+USER: "Hello"
 OUTPUT: general_chat
 
-Return ONLY the label, nothing else.
-
+Return ONLY the intent label. Do NOT explain.
 """
 
-def classify_intent_llm(text):
+# ------------------------------------------------------------------
+# Intent Classification Function
+# ------------------------------------------------------------------
+
+def classify_intent_llm(text: str) -> str:
+    """
+    Classifies user query into exactly one intent label.
+    """
+
     response = client.chat.completions.create(
         model=MODEL_NAME,
         messages=[
@@ -62,4 +122,5 @@ def classify_intent_llm(text):
             {"role": "user", "content": text}
         ]
     )
+
     return response.choices[0].message["content"].strip()
