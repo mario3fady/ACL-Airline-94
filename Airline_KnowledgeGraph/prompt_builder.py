@@ -63,7 +63,8 @@ def build_structured_prompt(user_query, context):
     - PERSONA
     - TASK
     """
-
+    print("totoooo")
+    
     context_text = format_context_for_prompt(context)
 
     persona_text = (
@@ -77,6 +78,10 @@ def build_structured_prompt(user_query, context):
         "in the context above. "
         "Do NOT hallucinate or add extra information. "
         "If the context does not contain enough information, say so explicitly."
+        "If the user asks about how many times a passenger has flied you have to manually calculate it using all available flights you have in the data"
+        "If the user asks about most/least freequent flyer 'generation' you have to manually calculate by seeing how many unique rows the same 'generation' is in "
+        "If the user asks about most/least freequent flyer you have to manually calculate by seeing how many unique 'Took' relationships between each 'Passenger' node and  'Journey'"
+           
     )
 
     prompt = f"""

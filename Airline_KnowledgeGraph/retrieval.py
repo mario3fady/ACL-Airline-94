@@ -4,59 +4,78 @@ from queries import QUERIES
 from embeddings.embedding_retreival import get_similar_journeys
 
 
-def merge_results(baseline_list, embedding_list, key="journey"):
+def merge_results(baseline_list, embedding_list, key_candidates=None):
+    """
+    Merges baseline Cypher rows with embedding-based rows.
+    Automatically detects the correct unique key from a list of candidates.
+    """
 
     if baseline_list is None:
         baseline_list = []
     if embedding_list is None:
         embedding_list = []
 
-    cleaned_baseline = []
-    for r in baseline_list:
-        r_fixed = dict(r)
+    if key_candidates is None:
+        key_candidates = ["journey", "flight", "journey_id", "generation"]
 
-        # FIX: use generation as unique key
-        if "generation" in r_fixed:
-            r_fixed["journey"] = r_fixed.get("generation")
-
-        # Normal case
-        if "journey" not in r_fixed:
-            r_fixed["journey"] = r_fixed.get("journey") or r_fixed.get("flight") or None
-
-        r_fixed["score"] = None
-        cleaned_baseline.append(r_fixed)
-
-    cleaned_embedding = []
-    for r in embedding_list:
-        cleaned_embedding.append({
-            "journey": r.get("journey"),
-            "delay": r.get("delay"),
-            "food": r.get("food"),
-            "score": r.get("score")
-        })
+    def detect_key(row):
+        for k in key_candidates:
+            if k in row and row[k] is not None:
+                return k, row[k]
+        return None, None
 
     merged = {}
 
-    # Baseline always goes first — DO NOT override generation rows
-    for r in cleaned_baseline:
-        jid = r.get("journey")
-        if jid not in merged:
-            merged[jid] = r
+    # ---------------------------
+    # Add baseline first
+    # ---------------------------
+    for row in baseline_list:
+        row = dict(row)
+        key_name, key_value = detect_key(row)
 
-    # Embedding rows appended
-    for r in cleaned_embedding:
-        jid = r.get("journey")
-        if jid not in merged:
-            merged[jid] = r
+        if key_value is None:
+            # create artificial unique ID to avoid collisions
+            key_value = id(row)
+
+        row["score"] = None  # baseline has no embedding score
+        merged[key_value] = row
+
+    # ---------------------------
+    # Add embedding results
+    # ---------------------------
+    for row in embedding_list:
+        row = dict(row)
+        key_name, key_value = detect_key(row)
+
+        if key_value is None:
+            key_value = id(row)
+
+        if key_value not in merged:
+            merged[key_value] = row
         else:
-            if merged[jid].get("score") is None:
-                merged[jid]["score"] = r.get("score")
+            # merge scores instead of discarding embeddings
+            if merged[key_value].get("score") is None and row.get("score") is not None:
+                merged[key_value]["score"] = row["score"]
+
+            # merge any missing fields
+            for k, v in row.items():
+                if k not in merged[key_value] or merged[key_value][k] is None:
+                    merged[key_value][k] = v
 
     merged_list = list(merged.values())
+    # print("baseline_list", baseline_list)
+    # print("embeddings_list", embedding_list)
+    print("merged_list",merged_list)
 
-    merged_list.sort(key=lambda x: (x["score"] is None, x["score"]), reverse=False)
+    # ---------------------------
+    # Sort by embedding score
+    # ---------------------------
+    merged_list.sort(
+        key=lambda x: (x["score"] is None, x["score"] if x["score"] is not None else float("inf"))
+    )
 
     return merged_list
+
 
 # ---------------------------------------------------
 # FORMATTER: Convert KG raw data → human readable text
@@ -388,6 +407,7 @@ class Retriever:
         if query_key is None:
             return {"error": "Unable to determine query from intent/entities."}
 
+        print("bedooo", query_key)
         # 2. Run baseline Cypher
         baseline_result = self.run_query(query_key, params)
 
@@ -414,5 +434,6 @@ class Retriever:
                 "embedding_count": len(embedding_result)
             }
         }
+        
 
         return context

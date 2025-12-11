@@ -136,7 +136,7 @@ QUERIES = {
             avg_delay,
             avg_food,
             journey_count
-        LIMIT 5
+        LIMIT 50
     """,
 
     # 14. Frequent flyers – most journeys and miles (Bayza)
@@ -146,7 +146,7 @@ QUERIES = {
             COUNT(j) AS journey_count,
             SUM(j.actual_flown_miles) AS total_miles
         ORDER BY journey_count DESC
-        LIMIT 5
+        LIMIT 50
     """,
 
 
