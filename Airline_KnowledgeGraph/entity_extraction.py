@@ -5,7 +5,7 @@ HF_TOKEN = os.environ.get("HF_TOKEN")
 if HF_TOKEN is None:
     raise ValueError("❌ HF_TOKEN is not set.")
 
-MODEL_NAME = "deepseek-ai/DeepSeek-V3.2"  # <--- FIXED MODEL
+MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"  # <--- FIXED MODEL
 
 client = InferenceClient(api_key=HF_TOKEN)
 

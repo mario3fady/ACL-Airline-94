@@ -1,6 +1,6 @@
 QUERIES = {
 
-    # 1. Flight search (origin -> destination)
+    # 1. Flight search (origin -> destination) done
     "flight_search": """
         MATCH (j:Journey)-[:ON]->(f:Flight)
         MATCH (f)-[:DEPARTS_FROM]->(o:Airport)
@@ -15,7 +15,7 @@ QUERIES = {
         LIMIT 5
     """,
 
-    # 2. Delay info – "Which flights have the worst delays?"
+    # 2. Delay info – "Which flights have the worst delays?" (add if we want to know the origin and destination too)
     "delay_info": """
         MATCH (j:Journey)-[:ON]->(f:Flight)
         RETURN f.flight_number AS flight,
@@ -24,7 +24,7 @@ QUERIES = {
         LIMIT 5
     """,
 
-    # 3. Satisfaction query – best food satisfaction
+    # 3. Satisfaction query – best food satisfaction done
     "satisfaction_query": """
         MATCH (j:Journey)-[:ON]->(f:Flight)
         RETURN f.flight_number AS flight,
@@ -33,7 +33,7 @@ QUERIES = {
         LIMIT 5
     """,
 
-    # 4. Journey stats – aggregate delay & satisfaction per flight
+    # 4. Journey stats – aggregate delay & satisfaction per flight done
     "journey_stats": """
         MATCH (j:Journey)-[:ON]->(f:Flight)
         RETURN f.flight_number AS flight,
@@ -43,7 +43,7 @@ QUERIES = {
         LIMIT 5
     """,
 
-    # 5. Generation analysis – satisfaction and delay by generation
+    # 5. Generation analysis – satisfaction and delay by generation      not working on ui
     "generation_analysis": """
         MATCH (p:Passenger)-[:TOOK]->(j:Journey)
         RETURN p.generation AS generation,
@@ -53,7 +53,7 @@ QUERIES = {
         ORDER BY avg_food DESC
     """,
 
-    # 6. Class search – journeys filtered by passenger class
+    # 6. Class search – journeys filtered by passenger class          not working on ui
     "class_search": """
         MATCH (j:Journey)
         WHERE j.passenger_class = $class
@@ -63,7 +63,7 @@ QUERIES = {
         LIMIT 5
     """,
 
-    # 7. Loyalty miles – total miles flown by passengers at a loyalty level
+    # 7. Loyalty miles – total miles flown by passengers at a loyalty level       not working on ui
     "loyalty_miles": """
         MATCH (p:Passenger {loyalty_program_level: $level})-[:TOOK]->(j:Journey)
         RETURN p.loyalty_program_level AS level,
@@ -71,7 +71,7 @@ QUERIES = {
                COUNT(j) AS journey_count
         LIMIT 5
     """,
-    # 8. Airport delay – worst origin airports by average delay
+    # 8. Airport delay – worst origin airports by average delay       not working in ui
     "airport_delay": """
         MATCH (j:Journey)-[:ON]->(f:Flight)-[:DEPARTS_FROM]->(a:Airport)
         RETURN a.station_code AS airport,
@@ -81,7 +81,7 @@ QUERIES = {
         LIMIT 5
     """,
 
-    # 9. Route satisfaction – best routes by food satisfaction
+    # 9. Route satisfaction – best routes by food satisfaction  done
     "route_satisfaction": """
         MATCH (j:Journey)-[:ON]->(f:Flight)
         MATCH (f)-[:DEPARTS_FROM]->(o:Airport)
@@ -94,7 +94,7 @@ QUERIES = {
         LIMIT 5
     """,
 
-    # 10. Class delay – average delay by passenger class
+    # 10. Class delay – average delay by passenger class      not working in ui
     "class_delay": """
         MATCH (j:Journey)
         RETURN j.passenger_class AS class,
