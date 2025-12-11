@@ -71,7 +71,7 @@ QUERIES = {
                COUNT(j) AS journey_count
         LIMIT 5
     """,
-    # 8. Airport delay – worst origin airports by average delay       not working in ui
+    # 8. Airport delay – worst origin airports by average delay       not working in ui (Bayza)
     "airport_delay": """
         MATCH (j:Journey)-[:ON]->(f:Flight)-[:DEPARTS_FROM]->(a:Airport)
         RETURN a.station_code AS airport,
@@ -81,7 +81,7 @@ QUERIES = {
         LIMIT 5
     """,
 
-    # 9. Route satisfaction – best routes by food satisfaction  done
+    # 9. Route satisfaction – best routes by food satisfaction  (done)
     "route_satisfaction": """
         MATCH (j:Journey)-[:ON]->(f:Flight)
         MATCH (f)-[:DEPARTS_FROM]->(o:Airport)
@@ -94,7 +94,7 @@ QUERIES = {
         LIMIT 5
     """,
 
-    # 10. Class delay – average delay by passenger class      not working in ui
+    # 10. Class delay – average delay by passenger class      not working in ui (Bayza)
     "class_delay": """
         MATCH (j:Journey)
         RETURN j.passenger_class AS class,
@@ -104,7 +104,7 @@ QUERIES = {
         LIMIT 3
     """,
 
-    # 11. Class satisfaction – average food satisfaction by class
+    # 11. Class satisfaction – average food satisfaction by class (Bayza)
     "class_satisfaction": """
         MATCH (j:Journey)
         RETURN j.passenger_class AS class,
@@ -113,7 +113,7 @@ QUERIES = {
         ORDER BY avg_food DESC
     """,
 
-    # 12. Fleet performance – aircraft type comparison
+    # 12. Fleet performance – aircraft type comparison (Bayza)
     "fleet_performance": """
         MATCH (j:Journey)-[:ON]->(f:Flight)
         RETURN f.fleet_type_description AS fleet,
@@ -124,7 +124,7 @@ QUERIES = {
         LIMIT 5
     """,
 
-    # 13. High risk passengers – consistently bad experience
+    # 13. High risk passengers – consistently bad experience (Bayza)
     "high_risk_passengers": """
         MATCH (p:Passenger)-[:TOOK]->(j:Journey)
         WITH p,
@@ -139,7 +139,7 @@ QUERIES = {
         LIMIT 5
     """,
 
-    # 14. Frequent flyers – most journeys and miles
+    # 14. Frequent flyers – most journeys and miles (Bayza)
     "frequent_flyers": """
         MATCH (p:Passenger)-[:TOOK]->(j:Journey)
         RETURN p.record_locator AS passenger,
