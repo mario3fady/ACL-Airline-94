@@ -1,6 +1,5 @@
 import json
 
-
 def format_context_for_prompt(context):
     """
     Convert the merged KG results into a readable structured text
@@ -17,6 +16,17 @@ def format_context_for_prompt(context):
     for r in merged:
         line = []
 
+        # ---------------- FIXED GENERATION HANDLING ----------------
+        if "generation" in r:
+            line.append(f"Generation: {r.get('generation')}")
+            line.append(f"Avg Food Score: {r.get('avg_food')}")
+            line.append(f"Avg Delay: {r.get('avg_delay')} minutes")
+            line.append(f"Journeys Count: {r.get('journey_count')}")
+            lines.append(" - " + " | ".join(line))
+            continue
+        # ------------------------------------------------------------
+
+        # Normal journey / flight rows
         if "journey" in r and r["journey"] is not None:
             line.append(f"Journey ID: {r['journey']}")
 
@@ -46,7 +56,6 @@ def format_context_for_prompt(context):
     return "\n".join(lines)
 
 
-
 def build_structured_prompt(user_query, context):
     """
     Builds the 3-part structured prompt required by Milestone 3.b:
@@ -55,17 +64,14 @@ def build_structured_prompt(user_query, context):
     - TASK
     """
 
-    # 1. Convert KG results to readable text
     context_text = format_context_for_prompt(context)
 
-    # 2. Persona
     persona_text = (
         "You are an Airline Knowledge Graph Assistant. "
         "You specialize in analyzing flight routes, delays, satisfaction scores, "
         "and journey statistics using accurate factual data from the KG."
     )
 
-    # 3. Task instructions
     task_text = (
         "Your job is to answer the user's question using ONLY the facts provided "
         "in the context above. "
@@ -73,7 +79,6 @@ def build_structured_prompt(user_query, context):
         "If the context does not contain enough information, say so explicitly."
     )
 
-    # FINAL STRUCTURED PROMPT
     prompt = f"""
 [CONTEXT]
 {context_text}

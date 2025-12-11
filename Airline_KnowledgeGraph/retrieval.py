@@ -5,34 +5,27 @@ from embeddings.embedding_retreival import get_similar_journeys
 
 
 def merge_results(baseline_list, embedding_list, key="journey"):
-    """
-    Merge baseline Cypher results and embedding-based results:
-    - Convert everything to consistent dictionaries
-    - Remove duplicates by `key` (default: journey/feedback_ID)
-    - Return merged sorted by embedding score (if available)
-    """
 
     if baseline_list is None:
         baseline_list = []
-
     if embedding_list is None:
         embedding_list = []
 
-    # Standardize baseline: ensure all records have a "journey" or "flight" key
     cleaned_baseline = []
     for r in baseline_list:
         r_fixed = dict(r)
 
-        # Make sure every record has a unique ID field
+        # FIX: use generation as unique key
+        if "generation" in r_fixed:
+            r_fixed["journey"] = r_fixed.get("generation")
+
+        # Normal case
         if "journey" not in r_fixed:
-            # Some queries return flight_number; embed-based returns journey ID
             r_fixed["journey"] = r_fixed.get("journey") or r_fixed.get("flight") or None
 
-        # No embedding score here
         r_fixed["score"] = None
         cleaned_baseline.append(r_fixed)
 
-    # Clean embedding results (they already contain journey + score)
     cleaned_embedding = []
     for r in embedding_list:
         cleaned_embedding.append({
@@ -42,25 +35,25 @@ def merge_results(baseline_list, embedding_list, key="journey"):
             "score": r.get("score")
         })
 
-    # Deduplicate using a dictionary keyed by journey ID
     merged = {}
+
+    # Baseline always goes first — DO NOT override generation rows
     for r in cleaned_baseline:
         jid = r.get("journey")
         if jid not in merged:
             merged[jid] = r
 
+    # Embedding rows appended
     for r in cleaned_embedding:
         jid = r.get("journey")
         if jid not in merged:
             merged[jid] = r
         else:
-            # If exists, update with embedding score
-            merged[jid]["score"] = r.get("score")
+            if merged[jid].get("score") is None:
+                merged[jid]["score"] = r.get("score")
 
-    # Convert back to list
     merged_list = list(merged.values())
 
-    # Sort by embedding similarity when available
     merged_list.sort(key=lambda x: (x["score"] is None, x["score"]), reverse=False)
 
     return merged_list
@@ -74,6 +67,7 @@ def format_kg_result(intent, records):
     Safely handles missing keys and invalid record types.
     """
 
+    # --- Embedding-only similarity mode ---
     if intent == "embedding_similarity":
         lines = ["Here are journeys most similar to your request:\n"]
         for r in records:
@@ -132,7 +126,29 @@ def format_kg_result(intent, records):
             )
         return "\n".join(lines)
 
-    # ---------------- PASSENGER JOURNEYS ----------------
+    # ---------------- GENERATION ANALYSIS ----------------
+    if intent == "generation_analysis":
+        lines = ["Generation analysis (satisfaction & delays):\n"]
+        for r in safe_records:
+            lines.append(
+                f"- Generation {r.get('generation')}: "
+                f"Avg Food Score = {r.get('avg_food'):.1f}, "
+                f"Avg Delay = {r.get('avg_delay'):.1f} min, "
+                f"Journeys = {r.get('journey_count')}."
+            )
+        return "\n".join(lines)
+
+    # ---------------- PASSENGER JOURNEY (SINGULAR) ----------------
+    if intent == "passenger_journey":
+        lines = ["Passenger journey history:\n"]
+        for r in safe_records:
+            lines.append(
+                f"- Journey {r.get('journey')} | Flight {r.get('flight')} | "
+                f"Delay = {r.get('delay')} minutes | Food Score = {r.get('food_score')}."
+            )
+        return "\n".join(lines)
+
+    # ---------------- LEGACY PASSENGER_JOURNEYS (keep for safety) ----------------
     if intent == "passenger_journeys":
         lines = ["Passenger journey history:\n"]
         for r in safe_records:
@@ -163,10 +179,9 @@ def format_kg_result(intent, records):
             )
         return "\n".join(lines)
 
-    # DEFAULT
     # ---------------------- AIRPORT DELAY ----------------------
     if intent == "airport_delay":
-        lines.append("Worst airports by delay:\n")
+        lines = ["Worst airports by delay:\n"]
         for r in safe_records:
             lines.append(
                 f"- Airport {r.get('airport')}: avg delay {r.get('avg_delay'):.1f} min "
@@ -176,7 +191,7 @@ def format_kg_result(intent, records):
 
     # ---------------------- ROUTE SATISFACTION ----------------------
     if intent == "route_satisfaction":
-        lines.append("Best routes for food satisfaction:\n")
+        lines = ["Best routes for food satisfaction:\n"]
         for r in safe_records:
             lines.append(
                 f"- {r.get('origin')} → {r.get('destination')}: avg food {r.get('avg_food'):.1f}, "
@@ -186,7 +201,7 @@ def format_kg_result(intent, records):
 
     # ---------------------- CLASS DELAY ----------------------
     if intent == "class_delay":
-        lines.append("Delays by passenger class:\n")
+        lines = ["Delays by passenger class:\n"]
         for r in safe_records:
             lines.append(
                 f"- Class {r.get('class')}: avg delay {r.get('avg_delay'):.1f} min "
@@ -196,7 +211,7 @@ def format_kg_result(intent, records):
 
     # ---------------------- CLASS SATISFACTION ----------------------
     if intent == "class_satisfaction":
-        lines.append("Food satisfaction by passenger class:\n")
+        lines = ["Food satisfaction by passenger class:\n"]
         for r in safe_records:
             lines.append(
                 f"- Class {r.get('class')}: avg food score {r.get('avg_food'):.1f} "
@@ -206,7 +221,7 @@ def format_kg_result(intent, records):
 
     # ---------------------- FLEET PERFORMANCE ----------------------
     if intent == "fleet_performance":
-        lines.append("Fleet performance summary:\n")
+        lines = ["Fleet performance summary:\n"]
         for r in safe_records:
             lines.append(
                 f"- Fleet {r.get('fleet')}: avg delay {r.get('avg_delay'):.1f} min, "
@@ -216,7 +231,7 @@ def format_kg_result(intent, records):
 
     # ---------------------- HIGH RISK PASSENGERS ----------------------
     if intent == "high_risk_passengers":
-        lines.append("Passengers with consistently bad experiences:\n")
+        lines = ["Passengers with consistently bad experiences:\n"]
         for r in safe_records:
             lines.append(
                 f"- Passenger {r.get('passenger')}: avg delay {r.get('avg_delay'):.1f}, "
@@ -226,7 +241,7 @@ def format_kg_result(intent, records):
 
     # ---------------------- FREQUENT FLYERS ----------------------
     if intent == "frequent_flyers":
-        lines.append("Top frequent flyers:\n")
+        lines = ["Top frequent flyers:\n"]
         for r in safe_records:
             lines.append(
                 f"- Passenger {r.get('passenger')}: {r.get('journey_count')} journeys, "
@@ -309,10 +324,20 @@ class Retriever:
         # ---------- SATISFACTION ----------
         if intent == "satisfaction_query":
             return "satisfaction_query", {}
-        
+
+        # ---------- GENERATION ANALYSIS ----------
         if intent == "generation_analysis":
             # No parameters needed
             return "generation_analysis", {}
+
+        # ---------- CLASS SEARCH ----------
+        if intent == "class_search":
+            # Assume first passenger-like token is the class name (e.g., "Economy")
+            cls = passengers[0] if passengers else ""
+            if not cls:
+                print("⚠ Missing passenger class for class_search")
+                return None, {}
+            return "class_search", {"class": cls}
 
         # ---------- AIRPORT DELAY ----------
         if intent == "airport_delay":
@@ -343,6 +368,14 @@ class Retriever:
         # ---------- FREQUENT FLYERS ----------
         if intent == "frequent_flyers":
             return "frequent_flyers", {}
+
+        # ---------- PASSENGER JOURNEY ----------
+        if intent == "passenger_journey":
+            if not passengers:
+                print("⚠ No passenger ID detected for passenger_journey")
+                return None, {}
+            record_locator = passengers[0]
+            return "passenger_journey", {"record_locator": record_locator}
 
         # Unknown intent
         return None, {}

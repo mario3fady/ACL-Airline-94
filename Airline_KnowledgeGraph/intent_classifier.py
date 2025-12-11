@@ -1,4 +1,5 @@
 import os
+import re
 from huggingface_hub import InferenceClient
 
 # ------------------------------------------------------------------
@@ -33,6 +34,9 @@ INTENT LABELS:
 - airport_delay
   → delays by airport or station
 
+- generation_analysis
+  → comparisons by passenger generation
+
 - route_satisfaction
   → best or worst routes by satisfaction or experience
 
@@ -51,9 +55,6 @@ INTENT LABELS:
 - frequent_flyers
   → most frequent travelers or most journeys
 
-- generation_analysis
-  → comparisons by passenger generation
-
 - loyalty_miles
   → miles flown, loyalty level analysis
 
@@ -65,6 +66,10 @@ INTENT LABELS:
 
 - general_chat
   → greetings or unrelated conversation
+
+NOTE:
+- Queries like "show journeys for passenger ABXX7J" are handled by a rule-based
+  shortcut as intent = passenger_journey, even though that label is not in this list.
 
 CLASSIFICATION RULES:
 
@@ -112,10 +117,34 @@ Return ONLY the intent label. Do NOT explain.
 
 def classify_intent_llm(text: str) -> str:
     """
-    Classifies user query into exactly one intent label.
+    Classifies user query into exactly one intent label using:
+    1. Rule-based shortcuts (for accuracy and control)
+    2. LLM classification (fallback for all other cases)
     """
+    txt = text.lower()
 
-    response = client.chat.completions.create(
+    # 1) PASSENGER JOURNEY SHORTCUT (record locator + 'passenger')
+    record_locator_match = re.search(r"\b[A-Z0-9]{5,8}\b", text)
+    if record_locator_match and "passenger" in txt:
+        return "passenger_journey"
+
+    # 2) GENERATION ANALYSIS SHORTCUT
+    generation_keywords = [
+        "generation", "generational", "gen z", "millennial",
+        "baby boomer", "older", "younger", "age group",
+        "compare generations", "age comparison"
+    ]
+    if any(word in txt for word in generation_keywords):
+        return "generation_analysis"
+
+    # 3) FALLBACK LLM CLASSIFICATION
+    response = client.chat_completions.create(
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content": INTENT_SYSTEM_PROMPT},
+            {"role": "user", "content": text}
+        ]
+    ) if hasattr(client, "chat_completions") else client.chat.completions.create(
         model=MODEL_NAME,
         messages=[
             {"role": "system", "content": INTENT_SYSTEM_PROMPT},
