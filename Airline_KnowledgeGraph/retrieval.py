@@ -164,6 +164,77 @@ def format_kg_result(intent, records):
         return "\n".join(lines)
 
     # DEFAULT
+    # ---------------------- AIRPORT DELAY ----------------------
+    if intent == "airport_delay":
+        lines.append("Worst airports by delay:\n")
+        for r in safe_records:
+            lines.append(
+                f"- Airport {r.get('airport')}: avg delay {r.get('avg_delay'):.1f} min "
+                f"across {r.get('journey_count')} journeys."
+            )
+        return "\n".join(lines)
+
+    # ---------------------- ROUTE SATISFACTION ----------------------
+    if intent == "route_satisfaction":
+        lines.append("Best routes for food satisfaction:\n")
+        for r in safe_records:
+            lines.append(
+                f"- {r.get('origin')} → {r.get('destination')}: avg food {r.get('avg_food'):.1f}, "
+                f"{r.get('journey_count')} journeys."
+            )
+        return "\n".join(lines)
+
+    # ---------------------- CLASS DELAY ----------------------
+    if intent == "class_delay":
+        lines.append("Delays by passenger class:\n")
+        for r in safe_records:
+            lines.append(
+                f"- Class {r.get('class')}: avg delay {r.get('avg_delay'):.1f} min "
+                f"({r.get('journey_count')} journeys)."
+            )
+        return "\n".join(lines)
+
+    # ---------------------- CLASS SATISFACTION ----------------------
+    if intent == "class_satisfaction":
+        lines.append("Food satisfaction by passenger class:\n")
+        for r in safe_records:
+            lines.append(
+                f"- Class {r.get('class')}: avg food score {r.get('avg_food'):.1f} "
+                f"({r.get('journey_count')} journeys)."
+            )
+        return "\n".join(lines)
+
+    # ---------------------- FLEET PERFORMANCE ----------------------
+    if intent == "fleet_performance":
+        lines.append("Fleet performance summary:\n")
+        for r in safe_records:
+            lines.append(
+                f"- Fleet {r.get('fleet')}: avg delay {r.get('avg_delay'):.1f} min, "
+                f"avg food {r.get('avg_food'):.1f}, {r.get('journey_count')} journeys."
+            )
+        return "\n".join(lines)
+
+    # ---------------------- HIGH RISK PASSENGERS ----------------------
+    if intent == "high_risk_passengers":
+        lines.append("Passengers with consistently bad experiences:\n")
+        for r in safe_records:
+            lines.append(
+                f"- Passenger {r.get('passenger')}: avg delay {r.get('avg_delay'):.1f}, "
+                f"avg food {r.get('avg_food'):.1f}, {r.get('journey_count')} journeys."
+            )
+        return "\n".join(lines)
+
+    # ---------------------- FREQUENT FLYERS ----------------------
+    if intent == "frequent_flyers":
+        lines.append("Top frequent flyers:\n")
+        for r in safe_records:
+            lines.append(
+                f"- Passenger {r.get('passenger')}: {r.get('journey_count')} journeys, "
+                f"{r.get('total_miles')} miles."
+            )
+        return "\n".join(lines)
+
+    # Fallback
     return str(records)
 
 
@@ -238,6 +309,40 @@ class Retriever:
         # ---------- SATISFACTION ----------
         if intent == "satisfaction_query":
             return "satisfaction_query", {}
+        
+        if intent == "generation_analysis":
+            # No parameters needed
+            return "generation_analysis", {}
+
+        # ---------- AIRPORT DELAY ----------
+        if intent == "airport_delay":
+            # Aggregate per airport, no params
+            return "airport_delay", {}
+
+        # ---------- ROUTE SATISFACTION ----------
+        if intent == "route_satisfaction":
+            # Aggregate per origin-destination route
+            return "route_satisfaction", {}
+
+        # ---------- CLASS DELAY ----------
+        if intent == "class_delay":
+            return "class_delay", {}
+
+        # ---------- CLASS SATISFACTION ----------
+        if intent == "class_satisfaction":
+            return "class_satisfaction", {}
+
+        # ---------- FLEET PERFORMANCE ----------
+        if intent == "fleet_performance":
+            return "fleet_performance", {}
+
+        # ---------- HIGH RISK PASSENGERS ----------
+        if intent == "high_risk_passengers":
+            return "high_risk_passengers", {}
+
+        # ---------- FREQUENT FLYERS ----------
+        if intent == "frequent_flyers":
+            return "frequent_flyers", {}
 
         # Unknown intent
         return None, {}
