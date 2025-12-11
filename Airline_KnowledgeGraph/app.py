@@ -288,7 +288,7 @@ if st.session_state.page == "welcome":
 if st.session_state.page == "chat":
 
     # Navigation buttons
-    top_col1, top_col2, top_col3 = st.columns([1, 1, 4])
+    top_col1, top_col2, top_col3 = st.columns([1, 5, 4])
     with top_col1:
         if st.button("⬅ Back"):
             st.session_state.page = "welcome"
@@ -331,8 +331,6 @@ if st.session_state.page == "chat":
                 <div style='display:flex; justify-content:flex-start; margin:12px 0; animation: fadeIn 0.4s ease-in;'>
                     <div class='chat-bot' style='padding:12px 18px; border-radius:18px; max-width:70%;'>
                         🤖 {msg['content']}
-                    </div>
-                </div>
                 """,
                 unsafe_allow_html=True
             )
