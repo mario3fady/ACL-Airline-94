@@ -136,6 +136,16 @@ def classify_intent_llm(text: str) -> str:
     ]
     if any(word in txt for word in generation_keywords):
         return "generation_analysis"
+    
+    if "class" in txt and ("journey" in txt or "passengers" in txt or "show" in txt):
+      return "class_search"
+
+    if "loyalty" in txt or "miles" in txt or "premier" in txt:
+      return "loyalty_miles"
+    
+    if "worst delay" in txt or "class has the worst" in txt:
+      return "class_delay"
+
 
     # 3) FALLBACK LLM CLASSIFICATION
     response = client.chat_completions.create(
@@ -151,5 +161,6 @@ def classify_intent_llm(text: str) -> str:
             {"role": "user", "content": text}
         ]
     )
+    
 
     return response.choices[0].message["content"].strip()

@@ -2,102 +2,81 @@ import json
 
 def format_context_for_prompt(context):
     """
-    Convert the merged KG results into a readable structured text
-    for the LLM to consume.
+    Convert the merged KG results into clean JSON for the LLM.
+    This ensures the LLM can reliably interpret the data structure.
     """
-
     merged = context.get("merged", [])
 
     if not merged:
-        return "No relevant KG facts were found."
+        return "[]"
 
-    lines = ["Here are facts retrieved from the Airline Knowledge Graph:"]
-
-    for r in merged:
-        line = []
-
-        # ---------------- FIXED GENERATION HANDLING ----------------
-        if "generation" in r:
-            line.append(f"Generation: {r.get('generation')}")
-            line.append(f"Avg Food Score: {r.get('avg_food')}")
-            line.append(f"Avg Delay: {r.get('avg_delay')} minutes")
-            line.append(f"Journeys Count: {r.get('journey_count')}")
-            lines.append(" - " + " | ".join(line))
-            continue
-        # ------------------------------------------------------------
-
-        # Normal journey / flight rows
-        if "journey" in r and r["journey"] is not None:
-            line.append(f"Journey ID: {r['journey']}")
-
-        if "flight" in r:
-            line.append(f"Flight Number: {r['flight']}")
-
-        if "origin" in r:
-            line.append(f"Origin Airport: {r['origin']}")
-
-        if "destination" in r:
-            line.append(f"Destination Airport: {r['destination']}")
-
-        if "delay" in r:
-            line.append(f"Arrival Delay: {r['delay']} minutes")
-
-        if "food_score" in r:
-            line.append(f"Food Score: {r['food_score']}")
-
-        if "food" in r:
-            line.append(f"Food Score: {r['food']}")
-
-        if "score" in r and r["score"] is not None:
-            line.append(f"Similarity Score: {r['score']:.4f}")
-
-        lines.append(" - " + " | ".join(line))
-
-    return "\n".join(lines)
+    return json.dumps(merged, indent=2, ensure_ascii=False)
 
 
 def build_structured_prompt(user_query, context):
     """
-    Builds the 3-part structured prompt required by Milestone 3.b:
-    - CONTEXT
-    - PERSONA
-    - TASK
+    Strong, safe, detailed RAG prompt that forces the LLM to:
+    - Interpret journey rows correctly
+    - Interpret aggregated rows correctly
+    - Ignore embedding rows unless relevant
+    - NEVER hallucinate missing classes, flights, or data
+    - Always compute averages, totals, comparisons manually
     """
-    print("totoooo")
-    
+
     context_text = format_context_for_prompt(context)
 
-    persona_text = (
-        "You are an Airline Knowledge Graph Assistant. "
-        "You specialize in analyzing flight routes, delays, satisfaction scores, "
-        "and journey statistics using accurate factual data from the KG."
-    )
+    return f"""
+You are an Airline Knowledge Graph Analytics Assistant.
+You answer using ONLY the JSON data provided below.
 
-    task_text = (
-        "Your job is to answer the user's question using ONLY the facts provided "
-        "in the context above. "
-        "Do NOT hallucinate or add extra information. "
-        "If the context does not contain enough information, say so explicitly."
-        "If the user asks about how many times a passenger has flied you have to manually calculate it using all available flights you have in the data"
-        "If the user asks about most/least freequent flyer 'generation' you have to manually calculate by seeing how many unique rows the same 'generation' is in "
-        "If the user asks about most/least freequent flyer you have to manually calculate by seeing how many unique 'Took' relationships between each 'Passenger' node and  'Journey'"
-           
-    )
-
-    prompt = f"""
-[CONTEXT]
+==============================
+[KG_DATA]
 {context_text}
+==============================
 
-[PERSONA]
-{persona_text}
+==============================
+DATA DEFINITIONS — READ CAREFULLY:
+A Journey row (single passenger on a flight) typically contains:
+- journey or feedback_ID → unique journey identifier  
+- flight → flight_number  
+- origin, destination → airport codes  
+- delay or arrival_delay_minutes → minutes delayed (negative = early)  
+- food or food_satisfaction_score → 1 to 5  
+- passenger_class → Economy, Business, etc.  
+- generation → Gen X, Millennial, etc.  
+- loyalty_level or loyalty_program_level → bronze/silver/gold/1k levels  
+- actual_flown_miles → miles for that journey  
+- fleet → aircraft type  
 
-[TASK]
-{task_text}
+Aggregated rows (from Neo4j queries such as class_delay, journey_stats, fleet_performance) contain:
+- avg_delay  
+- avg_food  
+- journey_count  
+- fleet or passenger_class or generation  
 
-[USER QUESTION]
+Embedding rows (from semantic search) contain ONLY:
+- journey, delay, food, score  
+If a row has ONLY these 4 fields → it is NOT real KG data and MUST be ignored unless the question explicitly asks for similarity.
+
+==============================
+RULES FOR ANSWERING:
+1. Use ONLY the JSON rows in [KG_DATA]. Never invent information.
+2. If multiple row types exist (journey, aggregated, embedding), choose the one relevant to the question.
+3. If the question asks “best”, “worst”, “most”, “least”, you MUST compute rankings manually.
+4. If the question asks per class/generation/loyalty/fleet, you MUST aggregate rows manually.
+5. If data is missing (e.g., no Business class shown), explicitly say it is not in the dataset.
+6. Never confuse:
+   - journey rows  
+   - flight-level aggregates  
+   - class-level aggregates  
+   - embedding similarity rows  
+7. If a row contains a score but no flight/class data → ignore it for operational analysis.
+8. The final answer must be factual, concise, and grounded ONLY in the dataset.
+
+==============================
+USER QUESTION:
 {user_query}
 
-[ANSWER]
+==============================
+YOUR ANSWER (follow the rules above):
 """
-
-    return prompt.strip()

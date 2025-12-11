@@ -5,6 +5,8 @@ import configparser
 from prompt_builder import build_structured_prompt
 from llm_models import run_llm
 import os
+
+
 # -----------------------------
 # Load Neo4j credentials
 # -----------------------------
@@ -21,36 +23,99 @@ retriever = Retriever(
     PASSWORD,
 )
 
+
+# ================================================================
+# Helper: override bad LLM intent decisions (high-accuracy rules)
+# ================================================================
+def correct_intent(user_query, intent_from_llm):
+
+    q = user_query.lower()
+
+    if "class" in q:
+        if "delay" in q:
+            return "class_delay"
+        elif "satisfaction" in q or "food" in q:
+            return "class_satisfaction"
+
+
+    # ----- LOYALTY MILES -----
+    if "loyalty" in q or "premier" in q or "miles" in q:
+        return "loyalty_miles"
+
+    # ----- ROUTE SATISFACTION -----
+    if "route" in q and "satisfaction" in q:
+        return "route_satisfaction"
+
+    # ----- AIRPORT DELAY -----
+    if "airport" in q and "delay" in q:
+        return "airport_delay"
+
+    # otherwise keep LLM intent
+    return intent_from_llm
+
+
+# ================================================================
+# Helper: disable embeddings for structured logic-only queries
+# ================================================================
+NO_EMBEDDING_INTENTS = {
+    "flight_search",
+    "delay_info",
+    "satisfaction_query",
+    "journey_stats",
+    "generation_analysis",
+    "class_search",
+    "class_delay",
+    "class_satisfaction",
+    "loyalty_miles",
+    "airport_delay",
+    "fleet_performance",
+    "high_risk_passengers",
+    "frequent_flyers",
+    "route_satisfaction"
+}
+
+
+# ================================================================
+# MAIN QA FUNCTION
+# ================================================================
 def answer_question(user_query: str):
+
+    # -----------------------------
     # 1. Intent classification
-    intent = classify_intent_llm(user_query)
+    # -----------------------------
+    intent_raw = classify_intent_llm(user_query)
+    intent = correct_intent(user_query, intent_raw)
+
     print("\n--- INTENT ---")
     print(intent)
 
+    # -----------------------------
     # 2. Entity extraction
+    # -----------------------------
     entities = extract_entities_llm(user_query)
     print("\n--- ENTITIES ---")
     print(entities)
 
-    # 3. Hybrid KG Retrieval (baseline + embeddings)
-    context = retriever.retrieve(intent, entities, use_embeddings=True)
+    # -----------------------------
+    # 3. Hybrid KG Retrieval
+    #    disable embedding where not needed
+    # -----------------------------
+    use_embeddings = intent not in NO_EMBEDDING_INTENTS
 
-    # print("\n--- HYBRID CONTEXT ---")
-    # prompt = build_structured_prompt(user_query, context)
-    # llm_answer = run_llm(prompt)
+    context = retriever.retrieve(
+        intent=intent,
+        entities=entities,
+        use_embeddings=use_embeddings
+    )
 
-    # return {
-    #     "intent": intent,
-    #     "entities": entities,
-    #     "context": context,
-    #     "prompt_used": prompt,
-    #     "final_answer": llm_answer
-    # }
-
-        # 4. Build structured LLM prompt
+    # -----------------------------
+    # 4. Build LLM prompt
+    # -----------------------------
     prompt = build_structured_prompt(user_query, context)
 
-    # 5. Run all three LLMs for comparison
+    # -----------------------------
+    # 5. Run the three LLMs
+    # -----------------------------
     model_results = {
         "deepseek": run_llm("deepseek", prompt),
         "gemma": run_llm("gemma", prompt),
@@ -64,4 +129,3 @@ def answer_question(user_query: str):
         "prompt_used": prompt,
         "model_comparison": model_results
     }
-

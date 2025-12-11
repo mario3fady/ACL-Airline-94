@@ -127,5 +127,49 @@ def extract_entities_llm(question):
     for loc in locs:
         if loc not in parsed["passengers"]:
             parsed["passengers"].append(loc)
+            
+    # Normalize passenger classes
+    if "classes" in parsed:
+        parsed["classes"] = [
+            c.strip().capitalize()
+            for c in parsed["classes"]
+            if isinstance(c, str)
+        ]
+
+    # Normalize loyalty levels
+    if "passengers" in parsed:
+        parsed["passengers"] = [
+            p.strip().lower()
+            for p in parsed["passengers"]
+            if isinstance(p, str)
+        ]
+
+    # Normalize airport codes → ALWAYS uppercase
+    if "airports" in parsed:
+        parsed["airports"] = [
+            a.strip().upper()
+            for a in parsed["airports"]
+            if isinstance(a, str)
+        ]
+
+    # Normalize flights → numeric strings
+    if "flights" in parsed:
+        cleaned_flights = []
+        for f in parsed["flights"]:
+            if not isinstance(f, str):
+                continue
+            cleaned_flights.append(f.strip())
+        parsed["flights"] = cleaned_flights
+
+    # Normalize routes
+    if "routes" in parsed:
+        parsed["routes"]["origin"] = parsed["routes"]["origin"].upper().strip()
+        parsed["routes"]["destination"] = parsed["routes"]["destination"].upper().strip()
+
+    # ============================================================
+    # END NORMALIZATION LAYER
+    # ============================================================
+
+    return parsed
 
     return parsed
