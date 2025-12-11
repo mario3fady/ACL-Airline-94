@@ -43,7 +43,7 @@ QUERIES = {
         LIMIT 5
     """,
 
-    # 5. Passenger journeys by record locator
+    # 5. Passenger journeys by record locator (NOT WORKING)
     "passenger_journeys": """
         MATCH (p:Passenger {record_locator: $record_locator})-[:TOOK]->(j:Journey)
         RETURN j.feedback_ID AS journey,

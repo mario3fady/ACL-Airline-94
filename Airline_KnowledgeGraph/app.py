@@ -360,7 +360,7 @@ if st.session_state.page == "chat":
             # RUN BACKEND
             # -----------------------------------------------------
             try:
-                with st.spinner("✈️ Thinking... analyzing routes and satisfaction patterns..."):
+                with st.spinner("✈️ Thinking..."):
                     response = answer_question(user_msg)
             except Exception as e:
                 st.error(f"Backend Error: {str(e)}")
