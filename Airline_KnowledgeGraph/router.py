@@ -78,54 +78,56 @@ NO_EMBEDDING_INTENTS = {
 # ================================================================
 # MAIN QA FUNCTION
 # ================================================================
-def answer_question(user_query: str):
-
-    # -----------------------------
+def answer_question(user_query: str, retrieval_mode: str = "hybrid"):
     # 1. Intent classification
-    # -----------------------------
     intent_raw = classify_intent_llm(user_query)
     intent = correct_intent(user_query, intent_raw)
 
-    print("\n--- INTENT ---")
-    print(intent)
-
-    # -----------------------------
     # 2. Entity extraction
-    # -----------------------------
     entities = extract_entities_llm(user_query)
-    print("\n--- ENTITIES ---")
-    print(entities)
 
     # -----------------------------
-    # 3. Hybrid KG Retrieval
-    #    disable embedding where not needed
+    # 3. Retrieval mode handling
     # -----------------------------
-    use_embeddings = intent not in NO_EMBEDDING_INTENTS
+    # Determine whether to enable embeddings
+    if retrieval_mode == "baseline only":
+        use_embeddings = False
+    elif retrieval_mode == "embeddings only":
+        use_embeddings = True
+    else:  # hybrid
+        use_embeddings = intent not in NO_EMBEDDING_INTENTS
 
+    # Run the retriever
     context = retriever.retrieve(
         intent=intent,
         entities=entities,
-        use_embeddings=use_embeddings
+        use_embeddings=use_embeddings,
+        retrieval_mode=retrieval_mode  # ← pass to Retriever if you want
     )
 
     # -----------------------------
-    # 4. Build LLM prompt
+    # 4. Build prompt
     # -----------------------------
     prompt = build_structured_prompt(user_query, context)
 
     # -----------------------------
-    # 5. Run the three LLMs
+    # 5. Run LLMs
     # -----------------------------
     model_results = {
         "deepseek": run_llm("deepseek", prompt),
         "gemma": run_llm("gemma", prompt),
-        "llama": run_llm("llama", prompt)
+        "llama": run_llm("llama", prompt),
     }
 
     return {
         "intent": intent,
         "entities": entities,
-        "context": context,
+        "context": {
+            "baseline": context.get("baseline", []),
+            "embeddings": context.get("embeddings", []),
+            "merged": context.get("merged", []),
+            "queries": context.get("queries_executed", [])
+        },
         "prompt_used": prompt,
         "model_comparison": model_results
     }

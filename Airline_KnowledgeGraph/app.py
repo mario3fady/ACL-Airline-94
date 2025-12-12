@@ -27,9 +27,17 @@ if "user_input_key" not in st.session_state:
 if "theme" not in st.session_state:
     st.session_state.theme = "dark"  # default theme
 
+# persist last retrieved debug info (intent, entities, context, prompt, models)
+if "last_debug" not in st.session_state:
+    st.session_state.last_debug = None
+
+# persist retrieval mode label from UI
+if "retrieval_label" not in st.session_state:
+    st.session_state.retrieval_label = "hybrid (baseline + embeddings)"
+
 
 # -------------------------------
-# THEME HANDLER
+# THEME HANDLER (Neon blue dark / light)
 # -------------------------------
 def load_theme(theme: str) -> str:
     if theme == "dark":
@@ -43,61 +51,72 @@ def load_theme(theme: str) -> str:
 
         [data-testid="stSidebar"] {
             background: #020617;
+            color: #E5E7EB;
         }
 
         /* Chat bubbles */
         .chat-user {
-            background: linear-gradient(135deg, #1E88E5, #42A5F5);
+            background: linear-gradient(135deg, #1E88E5, #3B82F6);
             color: #F9FAFB;
-            box-shadow: 0 10px 20px rgba(15, 23, 42, 0.6);
+            box-shadow: 0 10px 20px rgba(15, 23, 42, 0.7);
         }
 
         .chat-bot {
             background-color: #111827;
             color: #E5E7EB;
-            box-shadow: 0 10px 20px rgba(15, 23, 42, 0.6);
+            box-shadow: 0 10px 20px rgba(15, 23, 42, 0.7);
         }
 
         /* Buttons */
         .stButton>button {
-            background-color: #2563EB;
-            color: white;
-            border-radius: 999px;
-            border: none;
-            padding: 0.5rem 1.2rem;
-            font-weight: 600;
-            transition: all 0.25s ease;
+            background-color: #2563EB !important;
+            color: white !important;
+            border-radius: 999px !important;
+            border: none !important;
+            padding: 0.5rem 1.2rem !important;
+            font-weight: 600 !important;
+            transition: all 0.25s ease !important;
         }
 
         .stButton>button:hover {
-            background-color: #1D4ED8;
+            background-color: #1D4ED8 !important;
             transform: translateY(-1px) scale(1.03);
-            box-shadow: 0 10px 25px rgba(37, 99, 235, 0.4);
+            box-shadow: 0 10px 25px rgba(37, 99, 235, 0.5);
         }
 
-        /* Text input styling */
-        .stTextInput > div > div > input {
-            border-radius: 999px;
-            padding: 0.75rem 1rem;
-            border: 1px solid #1F2937;
-            background-color: #020617;
-            color: #E5E7EB;
+        /* Text input styling (important to make it visible) */
+        .stTextInput > div > div > input,
+        .stTextArea textarea {
+            border-radius: 999px !important;
+            padding: 0.75rem 1rem !important;
+            border: 1px solid #1F2937 !important;
+            background-color: #020617 !important;
+            color: #E5E7EB !important;
         }
 
-        .stTextInput > div > div > input:focus {
-            border-color: #3B82F6;
-            box-shadow: 0 0 0 1px #3B82F6;
+        .stTextArea textarea {
+            border-radius: 12px !important;
+        }
+
+        .stTextInput > div > div > input:focus,
+        .stTextArea textarea:focus {
+            border-color: #3B82F6 !important;
+            box-shadow: 0 0 0 1px #3B82F6 !important;
+            outline: none !important;
+        }
+
+        /* Selectbox styling */
+        .stSelectbox > div div[data-baseweb="select"] > div {
+            background-color: #020617 !important;
+            color: #E5E7EB !important;
+            border-radius: 999px !important;
+            border: 1px solid #1F2937 !important;
         }
 
         /* Animations */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(8px); }
             to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Section titles */
-        h2, h3, h4 {
-            color: #E5E7EB;
         }
 
         /* Scrollbar tweak (dark) */
@@ -131,8 +150,8 @@ def load_theme(theme: str) -> str:
 
         /* Chat bubbles */
         .chat-user {
-            background: linear-gradient(135deg, #DCF8C6, #B7E4C7);
-            color: #0F172A;
+            background: linear-gradient(135deg, #DCFCE7, #BBF7D0);
+            color: #065F46;
             box-shadow: 0 10px 20px rgba(148, 163, 184, 0.4);
         }
 
@@ -144,39 +163,48 @@ def load_theme(theme: str) -> str:
 
         /* Buttons */
         .stButton>button {
-            background-color: #0EA5E9;
-            color: white;
-            border-radius: 999px;
-            border: none;
-            padding: 0.5rem 1.2rem;
-            font-weight: 600;
-            transition: all 0.25s ease;
+            background-color: #0EA5E9 !important;
+            color: white !important;
+            border-radius: 999px !important;
+            border: none !important;
+            padding: 0.5rem 1.2rem !important;
+            font-weight: 600 !important;
+            transition: all 0.25s ease !important;
         }
 
         .stButton>button:hover {
-            background-color: #0284C7;
+            background-color: #0284C7 !important;
             transform: translateY(-1px) scale(1.03);
             box-shadow: 0 10px 25px rgba(14, 165, 233, 0.4);
         }
 
         /* Text input styling */
-        .stTextInput > div > div > input {
-            border-radius: 999px;
-            padding: 0.75rem 1rem;
-            border: 1px solid #CBD5F5;
-            background-color: white;
-            color: #0F172A;
+        .stTextInput > div > div > input,
+        .stTextArea textarea {
+            border-radius: 999px !important;
+            padding: 0.75rem 1rem !important;
+            border: 1px solid #CBD5E1 !important;
+            background-color: white !important;
+            color: #0F172A !important;
         }
 
-        .stTextInput > div > div > input:focus {
-            border-color: #0EA5E9;
-            box-shadow: 0 0 0 1px #0EA5E9;
+        .stTextArea textarea {
+            border-radius: 12px !important;
         }
 
-        /* Animations */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
+        .stTextInput > div > div > input:focus,
+        .stTextArea textarea:focus {
+            border-color: #0EA5E9 !important;
+            box-shadow: 0 0 0 1px #0EA5E9 !important;
+            outline: none !important;
+        }
+
+        /* Selectbox styling */
+        .stSelectbox > div div[data-baseweb="select"] > div {
+            background-color: white !important;
+            color: #0F172A !important;
+            border-radius: 999px !important;
+            border: 1px solid #CBD5E1 !important;
         }
 
         /* Scrollbar tweak (light) */
@@ -207,7 +235,6 @@ st.markdown(load_theme(st.session_state.theme), unsafe_allow_html=True)
 st.sidebar.header("⚙️ Settings")
 
 # Theme toggle
-
 if st.sidebar.button(
     "🌙 Dark Mode" if st.session_state.theme == "light" else "☀ Light Mode"
 ):
@@ -218,8 +245,6 @@ model_choice = st.sidebar.selectbox(
     "Choose LLM Model",
     ["deepseek", "gemma", "llama"]
 )
-
-
 
 
 # ======================================================
@@ -298,6 +323,7 @@ if st.session_state.page == "chat":
         if st.button("🧹 Clear Chat"):
             st.session_state.chat_history = []
             st.session_state.user_input_key += 1
+            st.session_state.last_debug = None
             st.rerun()
 
     st.markdown(
@@ -331,6 +357,7 @@ if st.session_state.page == "chat":
                 <div style='display:flex; justify-content:flex-start; margin:12px 0; animation: fadeIn 0.4s ease-in;'>
                     <div class='chat-bot' style='padding:12px 18px; border-radius:18px; max-width:70%;'>
                         🤖 {msg['content']}
+                    
                 """,
                 unsafe_allow_html=True
             )
@@ -344,61 +371,133 @@ if st.session_state.page == "chat":
             placeholder="Type your message here about flights, delays, journeys, or satisfaction scores...",
             key=f"user_input_{st.session_state.user_input_key}",
             label_visibility="collapsed"
-)
+        )
 
+        # Retrieval mode selector (persistent)
+        retrieval_label = st.selectbox(
+            "Retrieval Method",
+            ["hybrid (baseline + embeddings)", "baseline only", "embeddings only"],
+            index=["hybrid (baseline + embeddings)", "baseline only", "embeddings only"].index(
+                st.session_state.retrieval_label
+            ),
+        )
 
         send_clicked = st.form_submit_button("Send")
 
     if send_clicked:
         if user_msg.strip() != "":
+            # Persist retrieval label in session
+            st.session_state.retrieval_label = retrieval_label
+
+            # Map UI label → backend retrieval_mode
+            if retrieval_label == "baseline only":
+                retrieval_mode = "baseline only"
+            elif retrieval_label == "embeddings only":
+                retrieval_mode = "embeddings only"
+            else:
+                retrieval_mode = "hybrid"
+
             # Save user message
             st.session_state.chat_history.append(
                 {"role": "user", "content": user_msg}
             )
 
-            # -----------------------------------------------------
-            # RUN BACKEND
-            # -----------------------------------------------------
+            # Call backend
             try:
                 with st.spinner("✈️ Thinking..."):
-                    response = answer_question(user_msg)
+                    response = answer_question(user_msg, retrieval_mode)
             except Exception as e:
                 st.error(f"Backend Error: {str(e)}")
                 st.stop()
 
-            # -----------------------------------------------------
-            # Display final answer
-            # -----------------------------------------------------
-            model_results = response["model_comparison"]
-            final_answer = model_results[model_choice]["answer"]
+            # Save latest debug info so it persists after rerun
+            st.session_state.last_debug = response
 
+            # Save bot answer (based on selected model)
+            final_answer = response["model_comparison"][model_choice]["answer"]
             st.session_state.chat_history.append({
                 "role": "assistant",
                 "content": final_answer
             })
 
-            # --- Intent & Entities ---
-            st.subheader("🧠 Detected Intent")
-            st.write(response.get("intent", ""))
-
-            st.subheader("🏷 Extracted Entities")
-            st.json(response.get("entities", {}))
-
-            # --- KG Retrieval Context ---
-            st.subheader("🧩 Hybrid KG Context")
-            st.json(response.get("context", {}))
-
-            # --- Prompt Used ---
-            with st.expander("📝 Structured Prompt Sent to LLM"):
-                st.code(response.get("prompt_used", ""), language="markdown")
-
-            # --- Model Comparison ---
-            st.subheader("🤖 Model Comparisons")
-            for model_name, data in model_results.items():
-                with st.expander(
-                    f"Model: {model_name.upper()} (Latency: {data['latency_seconds']}s)"
-                ):
-                    st.write(data["answer"])
-
+            # Increment key so next text_input is "fresh"
             st.session_state.user_input_key += 1
+
+            # Rerun so everything redraws cleanly
             st.rerun()
+
+    # -------------------------------
+    # DEBUG / CONTEXT PANEL (PERSISTENT)
+    # -------------------------------
+    if st.session_state.last_debug is not None:
+        response = st.session_state.last_debug
+
+        # --- Intent & Entities ---
+        st.subheader("🧠 Detected Intent")
+        st.write(response.get("intent", ""))
+
+        st.subheader("🏷 Extracted Entities")
+        st.json(response.get("entities", {}))
+
+        # --- Retrieval mode info ---
+        st.caption(f"Retrieval mode: **{st.session_state.retrieval_label}**")
+
+        # --- KG Retrieval Context ---
+        st.subheader("📦 KG Context Breakdown")
+
+        colA, colB, colC = st.columns(3)
+
+        with colA:
+            st.markdown("### 📘 Baseline Cypher Results")
+            st.json(response["context"].get("baseline", []))
+
+        with colB:
+            st.markdown("### 🔍 Embedding Results")
+            st.json(response["context"].get("embeddings", []))
+
+        with colC:
+            st.markdown("### 🔀 Merged Hybrid Result")
+            st.json(response["context"].get("merged", []))
+
+        # --- Cypher Queries Executed ---
+        st.subheader("🧾 Cypher Queries Executed")
+        for q in response["context"].get("queries", []):
+            st.code(q, language="cypher")
+
+        # --- Graph Visualization ---
+        st.subheader("🕸 Graph Visualization (Simplified)")
+
+        import networkx as nx
+        import matplotlib.pyplot as plt
+
+        G = nx.DiGraph()
+
+        for row in response["context"].get("baseline", []):
+            if "flight" in row:
+                G.add_node(f"Flight {row['flight']}", color="skyblue")
+            if "passenger" in row:
+                G.add_node(f"P-{row['passenger']}", color="lightgreen")
+            if "origin" in row and "destination" in row:
+                G.add_edge(row["origin"], row["destination"])
+            if "flight" in row and "passenger" in row:
+                G.add_edge(f"P-{row['passenger']}", f"Flight {row['flight']}")
+
+        if G.number_of_nodes() > 0:
+            colors = [G.nodes[n].get("color", "white") for n in G.nodes()]
+            plt.figure(figsize=(6, 4))
+            nx.draw(G, with_labels=True, node_color=colors, font_size=8)
+            st.pyplot(plt)
+        else:
+            st.info("No graph-visualizable relationships in this result set.")
+
+        # --- Prompt Used ---
+        with st.expander("📝 Structured Prompt Sent to LLM"):
+            st.code(response.get("prompt_used", ""), language="markdown")
+
+        # --- Model Comparison ---
+        st.subheader("🤖 Model Comparisons")
+        for model_name, data in response["model_comparison"].items():
+            with st.expander(
+                f"Model: {model_name.upper()} (Latency: {data['latency_seconds']}s)"
+            ):
+                st.write(data["answer"])
