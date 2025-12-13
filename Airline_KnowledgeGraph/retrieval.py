@@ -66,6 +66,8 @@ def merge_results(baseline_list, embedding_list, key_candidates=None):
     # print("baseline_list", baseline_list)
     # print("embeddings_list", embedding_list)
     print("merged_list",merged_list)
+    print("baseline_List",baseline_list)
+    print("embeddings_List", embedding_list)
 
     # ---------------------------
     # Sort by embedding score
@@ -120,16 +122,25 @@ class Retriever:
     # ---------------------------------------------------
     #   NEW: EMBEDDING QUERY WRAPPER
     # ---------------------------------------------------
-    def run_embedding_query(self, intent, entities):
+    def run_embedding_query(self, intent, params):
         """
-        Uses embedding-based retrieval for journeys
+        Runs the embedding-based retrieval for supported intents.
+        Right now, only 'journey_similarity' uses embeddings.
         """
-        try:
-            # Your embedding retrieval returns list[dict]
-            return get_similar_journeys(intent=intent, entities=entities)
-        except:
+        if intent != "journey_similarity":
             return []
 
+        journey_id = params.get("journey_id")
+        if not journey_id:
+            # If you want, you can also handle params["flight_number"] here later
+            print("⚠ journey_similarity called without journey_id")
+            return []
+
+        try:
+            return get_similar_journeys(journey_id=journey_id, top_k=10)
+        except Exception as e:
+            print("Embedding retrieval error:", e)
+            return []
 
     # ---------------- INTENT → QUERY ROUTING ----------------
     def route(self, intent, entities):
@@ -219,6 +230,15 @@ class Retriever:
         # ---------- FREQUENT FLYERS ----------
         if intent == "frequent_flyers":
             return "frequent_flyers", {}
+        
+        if intent == "journey_similarity":
+            # Try to get a journey ID first
+            journeys = entities.get("journeys", [])
+            flights = entities.get("flights", [])
+
+            if journeys:
+                # e.g. "F_16"
+                return "journey_similarity", {"journey_id": journeys[0]}
 
         # ---------- PASSENGER JOURNEY ----------
         if intent == "passenger_journey":
@@ -232,28 +252,35 @@ class Retriever:
         return None, {}
 
     # ---------------- MAIN RETRIEVAL METHOD ----------------
+        # ---------------- MAIN RETRIEVAL METHOD ----------------
     def retrieve(self, intent, entities, use_embeddings=True, retrieval_mode="hybrid"):
-        
-        # Track executed Cypher queries
+        """
+        Unified retrieval controller.
+        Supports:
+        - baseline only
+        - embeddings only
+        - hybrid (baseline + embeddings + merge)
+        """
+
+        # 0) Route intent + entities → (query_key, params)
+        query_key, params = self.route(intent, entities)
+
         queries_run = []
+        baseline_rows = []
+        embedding_rows = []
 
         # ----------------------------
         # 1. Baseline Retrieval
         # ----------------------------
-        baseline_rows = self.run_baseline_query(intent, entities)
-
-        # FIX: record cypher text
-        q_key, _ = self.route(intent, entities)
-        if q_key:
-            queries_run.append(QUERIES[q_key])
+        if retrieval_mode != "embeddings only" and query_key is not None and query_key in QUERIES:
+            baseline_rows = self.run_query(query_key, params)
+            queries_run.append(QUERIES[query_key])
 
         # ----------------------------
         # 2. Embedding Retrieval
         # ----------------------------
-        if use_embeddings or retrieval_mode == "embeddings only":
-            embedding_rows = self.run_embedding_query(intent, entities)
-        else:
-            embedding_rows = []
+        if use_embeddings and retrieval_mode != "baseline only":
+            embedding_rows = self.run_embedding_query(intent, params)
 
         # ----------------------------
         # 3. Retrieval Mode Logic
@@ -275,13 +302,10 @@ class Retriever:
             }
 
         # ----------------------------
-        # 4. Hybrid (baseline + embeddings)
+        # 4. Hybrid (Default)
         # ----------------------------
         merged = merge_results(baseline_rows, embedding_rows)
-        
-        print("retreive mode" , retrieval_mode)
-        print("baseline" , baseline_rows)
-        print("embeddings" , embedding_rows)
+
         return {
             "baseline": baseline_rows,
             "embeddings": embedding_rows,

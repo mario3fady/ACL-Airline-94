@@ -1,82 +1,85 @@
 import json
 
-def format_context_for_prompt(context):
-    """
-    Convert the merged KG results into clean JSON for the LLM.
-    This ensures the LLM can reliably interpret the data structure.
-    """
-    merged = context.get("merged", [])
-
-    if not merged:
+def format_context_json(obj):
+    try:
+        return json.dumps(obj, indent=2, ensure_ascii=False)
+    except:
         return "[]"
 
-    return json.dumps(merged, indent=2, ensure_ascii=False)
 
+def build_structured_prompt(user_query: str, context: dict):
 
-def build_structured_prompt(user_query, context):
-    """
-    Strong, safe, detailed RAG prompt that forces the LLM to:
-    - Interpret journey rows correctly
-    - Interpret aggregated rows correctly
-    - Ignore embedding rows unless relevant
-    - NEVER hallucinate missing classes, flights, or data
-    - Always compute averages, totals, comparisons manually
-    """
+    q = user_query.lower()
 
-    context_text = format_context_for_prompt(context)
+    # --------------------------------------------------
+    # 1. SIMILARITY QUERIES → USE EMBEDDING RESULTS ONLY
+    # --------------------------------------------------
+    is_similarity = ("similar" in q or "like" in q) and ("f_" in q or "journey" in q)
 
-    return f"""
-You are an Airline Knowledge Graph Analytics Assistant.
-You answer using ONLY the JSON data provided below.
+    if is_similarity:
+        data_rows = context.get("embeddings", [])
+    else:
+        data_rows = context.get("merged", [])
 
+    context_json = format_context_json(data_rows)
+
+    # --------------------------------------------------
+    # 2. Persona
+    # --------------------------------------------------
+    persona_text = (
+        "You are an Airline Knowledge Graph Analytics Assistant. "
+        "You answer ONLY using the JSON rows provided inside [KG_DATA]. "
+        "Never invent data. Never assume missing values."
+    )
+
+    # --------------------------------------------------
+    # 3. Task Instructions
+    # --------------------------------------------------
+    if is_similarity:
+        task_text = (
+            "The user is asking for JOURNEY SIMILARITY.\n"
+            "The rows in [KG_DATA] ARE the similarity results. Each row has:\n"
+            "- journey (a journey ID similar to the one asked about)\n"
+            "- delay\n"
+            "- food\n"
+            "- score (cosine similarity)\n\n"
+            "IMPORTANT RULES:\n"
+            "1. The original journey (e.g., F_1) **WILL NOT** appear in the list.\n"
+            "2. Do NOT check whether F_1 exists in the dataset — similarity does not require that.\n"
+            "3. Simply return the journeys ranked by score.\n"
+            "4. If the list is empty, say no similarity results exist.\n"
+        )
+    else:
+        task_text = (
+            "Use ONLY the rows in [KG_DATA] to answer the user's question.\n"
+            "Rows may represent:\n"
+            "- individual journeys\n"
+            "- aggregated metrics (avg_delay, avg_food, journey_count)\n"
+            "- flight-level analytics\n\n"
+            "RULES:\n"
+            "1. Never create data not shown in [KG_DATA].\n"
+            "2. Compute averages, best/worst, and counts manually if needed.\n"
+            "3. If information is missing, say so.\n"
+        )
+
+    # --------------------------------------------------
+    # 4. FINAL PROMPT
+    # --------------------------------------------------
+    prompt = f"""
 ==============================
 [KG_DATA]
-{context_text}
+{context_json}
 ==============================
 
-==============================
-DATA DEFINITIONS — READ CAREFULLY:
-A Journey row (single passenger on a flight) typically contains:
-- journey or feedback_ID → unique journey identifier  
-- flight → flight_number  
-- origin, destination → airport codes  
-- delay or arrival_delay_minutes → minutes delayed (negative = early)  
-- food or food_satisfaction_score → 1 to 5  
-- passenger_class → Economy, Business, etc.  
-- generation → Gen X, Millennial, etc.  
-- loyalty_level or loyalty_program_level → bronze/silver/gold/1k levels  
-- actual_flown_miles → miles for that journey  
-- fleet → aircraft type  
+[PERSONA]
+{persona_text}
 
-Aggregated rows (from Neo4j queries such as class_delay, journey_stats, fleet_performance) contain:
-- avg_delay  
-- avg_food  
-- journey_count  
-- fleet or passenger_class or generation  
+[TASK]
+{task_text}
 
-Embedding rows (from semantic search) contain ONLY:
-- journey, delay, food, score  
-If a row has ONLY these 4 fields → it is NOT real KG data and MUST be ignored unless the question explicitly asks for similarity.
-
-==============================
-RULES FOR ANSWERING:
-1. Use ONLY the JSON rows in [KG_DATA]. Never invent information.
-2. If multiple row types exist (journey, aggregated, embedding), choose the one relevant to the question.
-3. If the question asks “best”, “worst”, “most”, “least”, you MUST compute rankings manually.
-4. If the question asks per class/generation/loyalty/fleet, you MUST aggregate rows manually.
-5. If data is missing (e.g., no Business class shown), explicitly say it is not in the dataset.
-6. Never confuse:
-   - journey rows  
-   - flight-level aggregates  
-   - class-level aggregates  
-   - embedding similarity rows  
-7. If a row contains a score but no flight/class data → ignore it for operational analysis.
-8. The final answer must be factual, concise, and grounded ONLY in the dataset.
-
-==============================
-USER QUESTION:
+[USER QUESTION]
 {user_query}
 
-==============================
-YOUR ANSWER (follow the rules above):
+[ANSWER]
 """
+    return prompt.strip()

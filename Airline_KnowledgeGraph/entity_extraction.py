@@ -78,9 +78,24 @@ RETURN:
   "journeys": [],
   "routes": {"origin": "", "destination": ""}
 }
-
+USER: "Show me journeys similar to F_1"
+RETURN:{
+"flights": [],
+  "airports": [],
+  "passengers": [],
+  "journeys": ["F_1"],
+  "routes": {"origin": "", "destination": ""}
+  }
+  
 RETURN ONLY JSON. No prose.
 """
+
+
+def detect_journey_ids(text):
+    """
+    Returns strings like F_1, F_16, F_1234 from the user query.
+    """
+    return re.findall(r"\bF_\d+\b", text)
 
 def clean_json(text):
     text = text.strip()
@@ -110,11 +125,25 @@ def extract_entities_llm(question):
             "journeys": [],
             "routes": {"origin": "", "destination": ""}
         }
+      
+
 
     # --------- EXTRA HARDENING: inject record locators into `passengers` ---------
     # Record locators: 5–8 uppercase alphanumeric tokens (e.g. "BNXX5R")
     record_locator_pattern = r"\b[A-Z0-9]{5,8}\b"
     locs = re.findall(record_locator_pattern, question)
+    
+    journey_ids = detect_journey_ids(question)
+
+    if journey_ids:
+        parsed["journeys"] = journey_ids
+
+        # Ensure these are NOT classified as flights
+        parsed["flights"] = [
+            f for f in parsed.get("flights", [])
+            if f not in journey_ids
+            and f not in [jid.replace("F_", "") for jid in journey_ids]
+        ]
 
     # Remove airport-like 3-letter codes and very short tokens
     locs = [l for l in locs if len(l) >= 5]
@@ -172,4 +201,4 @@ def extract_entities_llm(question):
 
     return parsed
 
-    return parsed
+

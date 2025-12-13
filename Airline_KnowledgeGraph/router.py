@@ -49,6 +49,10 @@ def correct_intent(user_query, intent_from_llm):
     # ----- AIRPORT DELAY -----
     if "airport" in q and "delay" in q:
         return "airport_delay"
+    
+    if "similar" in q or "like" in q or "closest" in q:
+        return "journey_similarity"
+    
 
     # otherwise keep LLM intent
     return intent_from_llm
