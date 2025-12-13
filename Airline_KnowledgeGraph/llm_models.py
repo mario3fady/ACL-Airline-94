@@ -7,9 +7,7 @@ HF_TOKEN = os.environ.get("HF_TOKEN")
 if HF_TOKEN is None:
     raise ValueError("❌ HF_TOKEN is not set as environment variable.")
 
-# -----------------------------------------------
-# AVAILABLE MODELS (free + fast + works with HF API)
-# -----------------------------------------------
+
 AVAILABLE_MODELS = {
     "deepseek": "deepseek-ai/DeepSeek-V3.2",
     "gemma":    "google/gemma-2-2b-it",
@@ -17,9 +15,7 @@ AVAILABLE_MODELS = {
 }
 
 
-# -----------------------------------------------
-# UNIFIED LLM CALL FUNCTION
-# -----------------------------------------------
+
 def run_llm(model_name, prompt, max_tokens=500):
     if model_name not in AVAILABLE_MODELS:
         raise ValueError(f"Unknown model: {model_name}")

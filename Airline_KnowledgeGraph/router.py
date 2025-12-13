@@ -7,9 +7,6 @@ from llm_models import run_llm
 import os
 
 
-# -----------------------------
-# Load Neo4j credentials
-# -----------------------------
 config = configparser.ConfigParser()
 config.read("config.txt")
 
@@ -24,9 +21,7 @@ retriever = Retriever(
 )
 
 
-# ================================================================
-# Helper: override bad LLM intent decisions (high-accuracy rules)
-# ================================================================
+
 def correct_intent(user_query, intent_from_llm):
 
     q = user_query.lower()
