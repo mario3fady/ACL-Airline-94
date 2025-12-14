@@ -122,25 +122,38 @@ class Retriever:
     # ---------------------------------------------------
     #   NEW: EMBEDDING QUERY WRAPPER
     # ---------------------------------------------------
-    def run_embedding_query(self, intent, params):
+    def run_embedding_query(self, intent, params, embedding_model=None):
         """
         Runs the embedding-based retrieval for supported intents.
         Right now, only 'journey_similarity' uses embeddings.
+
+        embedding_model:
+            - None     → default to "model1"
+            - "model1" → Journey.embedding_model1 ([delay, miles])
+            - "model2" → Journey.embedding_model2 ([legs, food])
         """
         if intent != "journey_similarity":
             return []
 
         journey_id = params.get("journey_id")
         if not journey_id:
-            # If you want, you can also handle params["flight_number"] here later
+            # If you want, you can also handle params["flight_number"] later
             print("⚠ journey_similarity called without journey_id")
             return []
 
+        # Decide which model to use (fallback to model1)
+        model_to_use = embedding_model 
+
         try:
-            return get_similar_journeys(journey_id=journey_id, top_k=10)
+            return get_similar_journeys(
+                journey_id=journey_id,
+                top_k=10,
+                model=model_to_use,
+            )
         except Exception as e:
             print("Embedding retrieval error:", e)
             return []
+
 
     # ---------------- INTENT → QUERY ROUTING ----------------
     def route(self, intent, entities):
@@ -253,7 +266,7 @@ class Retriever:
 
     # ---------------- MAIN RETRIEVAL METHOD ----------------
         # ---------------- MAIN RETRIEVAL METHOD ----------------
-    def retrieve(self, intent, entities, use_embeddings=True, retrieval_mode="hybrid"):
+    def retrieve(self, intent, entities, use_embeddings=True, retrieval_mode="hybrid", embedding_model=None):
         """
         Unified retrieval controller.
         Supports:
@@ -276,11 +289,11 @@ class Retriever:
             baseline_rows = self.run_query(query_key, params)
             queries_run.append(QUERIES[query_key])
 
-        # ----------------------------
-        # 2. Embedding Retrieval
+               # ----------------------------
+        # 2. Embedding retrieval (optional)
         # ----------------------------
         if use_embeddings and retrieval_mode != "baseline only":
-            embedding_rows = self.run_embedding_query(intent, params)
+            embedding_rows = self.run_embedding_query(intent, params, embedding_model=embedding_model)
 
         # ----------------------------
         # 3. Retrieval Mode Logic

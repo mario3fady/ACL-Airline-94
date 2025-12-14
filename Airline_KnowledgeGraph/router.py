@@ -21,6 +21,39 @@ retriever = Retriever(
 )
 
 
+def select_embedding_model(user_query: str) -> str:
+    """
+    Decide which embedding model to use for journey similarity,
+    based on the wording of the user question.
+
+    model1 → [delay, miles]  (performance focus)
+    model2 → [legs, food]    (experience / structure focus)
+    """
+    q = user_query.lower()
+
+    performance_keywords = [
+        "delay", "delays", "on time", "punctual", "late", "lateness",
+        "arrival time", "arrival delay", "performance",
+        "distance", "miles", "long-haul", "short-haul", "flight length"
+    ]
+
+    experience_keywords = [
+        "stops", "stopovers", "connections", "legs", "layover",
+        "food", "meal", "catering", "service", "comfort", "experience"
+    ]
+
+    # If user explicitly talks about food/legs/comfort → model2
+    if any(kw in q for kw in experience_keywords):
+        return "model2"
+
+    # If user explicitly talks about delay/distance → model1
+    if any(kw in q for kw in performance_keywords):
+        return "model1"
+
+    # Fallback: use model1 as default (operational analytics)
+    return "model1"
+
+
 
 def correct_intent(user_query, intent_from_llm):
 
@@ -85,6 +118,12 @@ def answer_question(user_query: str, retrieval_mode: str = "hybrid"):
     # 2. Entity extraction
     entities = extract_entities_llm(user_query)
 
+        # 2.5 Decide which embedding model to use (only relevant for journey_similarity)
+    embedding_model = None
+    if intent == "journey_similarity":
+        embedding_model = select_embedding_model(user_query)
+
+
     # -----------------------------
     # 3. Retrieval mode handling
     # -----------------------------
@@ -101,8 +140,10 @@ def answer_question(user_query: str, retrieval_mode: str = "hybrid"):
         intent=intent,
         entities=entities,
         use_embeddings=use_embeddings,
-        retrieval_mode=retrieval_mode  # ← pass to Retriever if you want
+        retrieval_mode=retrieval_mode,
+        embedding_model=embedding_model,  # 👈 NEW
     )
+
 
     # -----------------------------
     # 4. Build prompt
