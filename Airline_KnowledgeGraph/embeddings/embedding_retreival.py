@@ -12,7 +12,18 @@ MODELS = {
     "mpnet": ("sentence-transformers/all-mpnet-base-v2", "journey_mpnet_index")
 }
 
-driver = GraphDatabase.driver(URI, auth=(USER, PASSWORD))
+    missing = []
+    if uri is None:
+        missing.append("NEO4J_URI")
+    if user is None:
+        missing.append("USER_NAME")
+    if password is None:
+        missing.append("PASSWORD")
+
+    if missing:
+        raise ValueError(f"❌ Missing environment variable(s): {', '.join(missing)}")
+
+    return uri, user, password
 
 
 def get_similar_journeys(query_text, model_key="minilm", top_k=5):

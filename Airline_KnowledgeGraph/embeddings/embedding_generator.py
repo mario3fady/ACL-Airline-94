@@ -39,6 +39,7 @@ def generate_embeddings():
         coalesce(j.passenger_class, 'Economy') AS cls
     """
 
+    # Update the embeddings on the Journey node
     update_query = """
     MATCH (j:Journey {{feedback_ID: $id}})
     SET j.embedding_{model} = $embedding
