@@ -1,77 +1,58 @@
 from neo4j import GraphDatabase
 from queries import QUERIES
-
 from embeddings.embedding_retreival import get_similar_journeys
 
 
+# ====================================================
+#                RESULT MERGING
+# ====================================================
 def merge_results(baseline_list, embedding_list, key_candidates=None):
     """
-    Merges baseline Cypher rows with embedding-based rows.
-    Automatically detects the correct unique key from a list of candidates.
+    Merge baseline KG rows with embedding similarity rows.
+    Embedding score is preserved and used for ranking.
     """
 
-    if baseline_list is None:
-        baseline_list = []
-    if embedding_list is None:
-        embedding_list = []
+    baseline_list = baseline_list or []
+    embedding_list = embedding_list or []
 
     if key_candidates is None:
-        key_candidates = ["journey", "flight", "journey_id", "generation"]
+        key_candidates = ["journey", "journey_id", "flight"]
 
-    def detect_key(row):
+    def get_key(row):
         for k in key_candidates:
             if k in row and row[k] is not None:
-                return k, row[k]
-        return None, None
+                return row[k]
+        return id(row)
 
     merged = {}
 
-    # ---------------------------
-    # Add baseline first
-    # ---------------------------
+    # Add baseline rows first
     for row in baseline_list:
         row = dict(row)
-        key_name, key_value = detect_key(row)
+        key = get_key(row)
+        row["score"] = None
+        merged[key] = row
 
-        if key_value is None:
-            # create artificial unique ID to avoid collisions
-            key_value = id(row)
-
-        row["score"] = None  # baseline has no embedding score
-        merged[key_value] = row
-
-    # ---------------------------
-    # Add embedding results
-    # ---------------------------
+    # Merge embedding rows
     for row in embedding_list:
         row = dict(row)
-        key_name, key_value = detect_key(row)
+        key = get_key(row)
 
-        if key_value is None:
-            key_value = id(row)
-
-        if key_value not in merged:
-            merged[key_value] = row
+        if key not in merged:
+            merged[key] = row
         else:
-            # merge scores instead of discarding embeddings
-            if merged[key_value].get("score") is None and row.get("score") is not None:
-                merged[key_value]["score"] = row["score"]
+            # Preserve embedding score
+            if row.get("score") is not None:
+                merged[key]["score"] = row["score"]
 
-            # merge any missing fields
+            # Fill missing fields
             for k, v in row.items():
-                if k not in merged[key_value] or merged[key_value][k] is None:
-                    merged[key_value][k] = v
+                if merged[key].get(k) is None:
+                    merged[key][k] = v
 
     merged_list = list(merged.values())
-    # print("baseline_list", baseline_list)
-    # print("embeddings_list", embedding_list)
-    print("merged_list",merged_list)
-    print("baseline_List",baseline_list)
-    print("embeddings_List", embedding_list)
 
-    # ---------------------------
-    # Sort by embedding score
-    # ---------------------------
+    # Sort: embedding hits first
     merged_list.sort(
         key=lambda x: (x["score"] is None, x["score"] if x["score"] is not None else float("inf"))
     )
@@ -79,11 +60,9 @@ def merge_results(baseline_list, embedding_list, key_candidates=None):
     return merged_list
 
 
-
-
-# ---------------------------------------------------
+# ====================================================
 #                RETRIEVER CLASS
-# ---------------------------------------------------
+# ====================================================
 class Retriever:
 
     def __init__(self, uri, user, password):
@@ -92,199 +71,148 @@ class Retriever:
     def close(self):
         self.driver.close()
 
-    # ---------------- CYPHER EXECUTION ----------------
+    # ------------------------------------------------
+    #               CYPHER EXECUTION
+    # ------------------------------------------------
     def run_query(self, query_key, params=None):
         query = QUERIES.get(query_key)
-        if query is None:
-            return {"error": f"Unknown query: {query_key}"}
+        if not query:
+            return []
 
-        if params is None:
-            params = {}
+        params = params or {}
 
         try:
             with self.driver.session() as session:
                 result = session.run(query, params)
                 return [r.data() for r in result]
         except Exception as e:
-            return {"error": str(e)}
-
-    # ---------------------------------------------------
-    #   NEW: BASELINE QUERY WRAPPER (needed for UI mode)
-    # ---------------------------------------------------
-    def run_baseline_query(self, intent, entities):
-        query_key, params = self.route(intent, entities)
-
-        if query_key is None:
+            print("Cypher error:", e)
             return []
 
-        return self.run_query(query_key, params)
+    # ------------------------------------------------
+    #           EMBEDDING RETRIEVAL
+    # ------------------------------------------------
+    def run_embedding_query(self, intent, params, embedding_model):
+        """
+        Embedding retrieval is ONLY used for journey similarity.
+        """
 
-    # ---------------------------------------------------
-    #   NEW: EMBEDDING QUERY WRAPPER
-    # ---------------------------------------------------
-    def run_embedding_query(self, intent, params):
-        """
-        Runs the embedding-based retrieval for supported intents.
-        Right now, only 'journey_similarity' uses embeddings.
-        """
         if intent != "journey_similarity":
             return []
 
         journey_id = params.get("journey_id")
         if not journey_id:
-            # If you want, you can also handle params["flight_number"] here later
-            print("⚠ journey_similarity called without journey_id")
+            print("⚠ journey_similarity without journey_id")
             return []
 
+        if embedding_model not in {"minilm", "mpnet"}:
+            print("⚠ Invalid embedding model:", embedding_model)
+            return []
+
+        query_text = f"Journey similar to {journey_id}"
+
         try:
-            return get_similar_journeys(journey_id=journey_id, top_k=10)
+            return get_similar_journeys(
+                query_text=query_text,
+                model_key=embedding_model,
+                top_k=15
+            )
         except Exception as e:
             print("Embedding retrieval error:", e)
             return []
 
-    # ---------------- INTENT → QUERY ROUTING ----------------
+    # ------------------------------------------------
+    #           INTENT → QUERY ROUTER
+    # ------------------------------------------------
     def route(self, intent, entities):
-        """
-        Convert (intent + extracted entities) → (query_key, params)
-        """
-
         airports = entities.get("airports", [])
         routes = entities.get("routes", {}) or {}
         passengers = entities.get("passengers", [])
-
-        print("\n--- ROUTER DEBUG ---")
-        print("Intent:", intent)
-        print("Entities:", entities)
+        journeys = entities.get("journeys", [])
 
         # ---------- FLIGHT SEARCH ----------
         if intent == "flight_search":
-            origin = routes.get("origin") or (airports[0] if len(airports) > 0 else "")
-            dest = routes.get("destination") or (airports[1] if len(airports) > 1 else "")
+            origin = routes.get("origin") or (airports[0] if len(airports) > 0 else None)
+            dest = routes.get("destination") or (airports[1] if len(airports) > 1 else None)
 
             if not origin or not dest:
-                print("⚠ Missing origin/destination → flight_search aborted")
                 return None, {}
-
             return "flight_search", {"origin": origin, "destination": dest}
 
-        # ---------- DELAY INFO ----------
-        if intent == "delay_info":
-            return "delay_info", {}
+        # ---------- SIMPLE AGGREGATES ----------
+        if intent in {
+            "delay_info",
+            "journey_stats",
+            "satisfaction_query",
+            "generation_analysis",
+            "airport_delay",
+            "route_satisfaction",
+            "class_delay",
+            "class_satisfaction",
+            "fleet_performance",
+            "high_risk_passengers",
+            "frequent_flyers"
+        }:
+            return intent, {}
 
-        # ---------- LOYALTY MILES ----------
+        # ---------- LOYALTY ----------
         if intent == "loyalty_miles":
-            level = passengers[0] if passengers else ""
-            if not level:
-                print("⚠ Missing loyalty level")
+            if not passengers:
                 return None, {}
-            return "loyalty_miles", {"level": level}
-
-        # ---------- JOURNEY STATS ----------
-        if intent == "journey_stats":
-            return "journey_stats", {}
-
-        # ---------- SATISFACTION ----------
-        if intent == "satisfaction_query":
-            return "satisfaction_query", {}
-
-        # ---------- GENERATION ANALYSIS ----------
-        if intent == "generation_analysis":
-            # No parameters needed
-            return "generation_analysis", {}
+            return "loyalty_miles", {"level": passengers[0]}
 
         # ---------- CLASS SEARCH ----------
         if intent == "class_search":
-            # Assume first passenger-like token is the class name (e.g., "Economy")
-            cls = passengers[0] if passengers else ""
-            if not cls:
-                print("⚠ Missing passenger class for class_search")
-                return None, {}
-            return "class_search", {"class": cls}
-
-        # ---------- AIRPORT DELAY ----------
-        if intent == "airport_delay":
-            # Aggregate per airport, no params
-            return "airport_delay", {}
-
-        # ---------- ROUTE SATISFACTION ----------
-        if intent == "route_satisfaction":
-            # Aggregate per origin-destination route
-            return "route_satisfaction", {}
-
-        # ---------- CLASS DELAY ----------
-        if intent == "class_delay":
-            return "class_delay", {}
-
-        # ---------- CLASS SATISFACTION ----------
-        if intent == "class_satisfaction":
-            return "class_satisfaction", {}
-
-        # ---------- FLEET PERFORMANCE ----------
-        if intent == "fleet_performance":
-            return "fleet_performance", {}
-
-        # ---------- HIGH RISK PASSENGERS ----------
-        if intent == "high_risk_passengers":
-            return "high_risk_passengers", {}
-
-        # ---------- FREQUENT FLYERS ----------
-        if intent == "frequent_flyers":
-            return "frequent_flyers", {}
-        
-        if intent == "journey_similarity":
-            # Try to get a journey ID first
-            journeys = entities.get("journeys", [])
-            flights = entities.get("flights", [])
-
-            if journeys:
-                # e.g. "F_16"
-                return "journey_similarity", {"journey_id": journeys[0]}
-
-        # ---------- PASSENGER JOURNEY ----------
-        if intent == "passenger_journey":
             if not passengers:
-                print("⚠ No passenger ID detected for passenger_journey")
                 return None, {}
-            record_locator = passengers[0]
-            return "passenger_journey", {"record_locator": record_locator}
+            return "class_search", {"class": passengers[0]}
 
-        # Unknown intent
+        # ---------- JOURNEY SIMILARITY ----------
+        if intent == "journey_similarity":
+            if not journeys:
+                return None, {}
+            return "journey_similarity", {"journey_id": journeys[0]}
+
         return None, {}
 
-    # ---------------- MAIN RETRIEVAL METHOD ----------------
-        # ---------------- MAIN RETRIEVAL METHOD ----------------
-    def retrieve(self, intent, entities, use_embeddings=True, retrieval_mode="hybrid"):
+    # ------------------------------------------------
+    #            MAIN RETRIEVAL PIPELINE
+    # ------------------------------------------------
+    def retrieve(
+        self,
+        intent,
+        entities,
+        embedding_model,
+        use_embeddings=True,
+        retrieval_mode="hybrid"
+    ):
         """
-        Unified retrieval controller.
         Supports:
         - baseline only
         - embeddings only
-        - hybrid (baseline + embeddings + merge)
+        - hybrid
         """
 
-        # 0) Route intent + entities → (query_key, params)
         query_key, params = self.route(intent, entities)
 
-        queries_run = []
         baseline_rows = []
         embedding_rows = []
+        queries_run = []
 
-        # ----------------------------
-        # 1. Baseline Retrieval
-        # ----------------------------
-        if retrieval_mode != "embeddings only" and query_key is not None and query_key in QUERIES:
+        # ---------- BASELINE ----------
+        if retrieval_mode != "embeddings only" and query_key in QUERIES:
             baseline_rows = self.run_query(query_key, params)
             queries_run.append(QUERIES[query_key])
 
-        # ----------------------------
-        # 2. Embedding Retrieval
-        # ----------------------------
+        # ---------- EMBEDDINGS ----------
         if use_embeddings and retrieval_mode != "baseline only":
-            embedding_rows = self.run_embedding_query(intent, params)
+            embedding_rows = self.run_embedding_query(
+                intent,
+                params,
+                embedding_model
+            )
 
-        # ----------------------------
-        # 3. Retrieval Mode Logic
-        # ----------------------------
+        # ---------- MODE LOGIC ----------
         if retrieval_mode == "baseline only":
             return {
                 "baseline": baseline_rows,
@@ -298,12 +226,9 @@ class Retriever:
                 "baseline": [],
                 "embeddings": embedding_rows,
                 "merged": embedding_rows,
-                "queries_executed": queries_run
+                "queries_executed": []
             }
 
-        # ----------------------------
-        # 4. Hybrid (Default)
-        # ----------------------------
         merged = merge_results(baseline_rows, embedding_rows)
 
         return {
@@ -312,5 +237,3 @@ class Retriever:
             "merged": merged,
             "queries_executed": queries_run
         }
-
-

@@ -25,7 +25,7 @@ if "user_input_key" not in st.session_state:
     st.session_state.user_input_key = 0
 
 if "theme" not in st.session_state:
-    st.session_state.theme = "dark"  # default theme
+    st.session_state.theme = "light"  # default theme
 
 # persist last retrieved debug info (intent, entities, context, prompt, models)
 if "last_debug" not in st.session_state:
@@ -40,102 +40,102 @@ if "retrieval_label" not in st.session_state:
 # THEME HANDLER (Neon blue dark / light)
 # -------------------------------
 def load_theme(theme: str) -> str:
-    if theme == "dark":
-        return """
-        <style>
-        /* Global background and text */
-        html, body, [class*="css"], [data-testid="stAppViewContainer"] {
-            background-color: #0F172A;
-            color: #F9FAFB;
-        }
+    # if theme == "dark":
+    #     return """
+    #     <style>
+    #     /* Global background and text */
+    #     html, body, [class*="css"], [data-testid="stAppViewContainer"] {
+    #         background-color: #0F172A;
+    #         color: #F9FAFB;
+    #     }
 
-        [data-testid="stSidebar"] {
-            background: #020617;
-            color: #E5E7EB;
-        }
+    #     [data-testid="stSidebar"] {
+    #         background: #020617;
+    #         color: #E5E7EB;
+    #     }
 
-        /* Chat bubbles */
-        .chat-user {
-            background: linear-gradient(135deg, #1E88E5, #3B82F6);
-            color: #F9FAFB;
-            box-shadow: 0 10px 20px rgba(15, 23, 42, 0.7);
-        }
+    #     /* Chat bubbles */
+    #     .chat-user {
+    #         background: linear-gradient(135deg, #1E88E5, #3B82F6);
+    #         color: #F9FAFB;
+    #         box-shadow: 0 10px 20px rgba(15, 23, 42, 0.7);
+    #     }
 
-        .chat-bot {
-            background-color: #111827;
-            color: #E5E7EB;
-            box-shadow: 0 10px 20px rgba(15, 23, 42, 0.7);
-        }
+    #     .chat-bot {
+    #         background-color: #111827;
+    #         color: #E5E7EB;
+    #         box-shadow: 0 10px 20px rgba(15, 23, 42, 0.7);
+    #     }
 
-        /* Buttons */
-        .stButton>button {
-            background-color: #2563EB !important;
-            color: white !important;
-            border-radius: 999px !important;
-            border: none !important;
-            padding: 0.5rem 1.2rem !important;
-            font-weight: 600 !important;
-            transition: all 0.25s ease !important;
-        }
+    #     /* Buttons */
+    #     .stButton>button {
+    #         background-color: #2563EB !important;
+    #         color: white !important;
+    #         border-radius: 999px !important;
+    #         border: none !important;
+    #         padding: 0.5rem 1.2rem !important;
+    #         font-weight: 600 !important;
+    #         transition: all 0.25s ease !important;
+    #     }
 
-        .stButton>button:hover {
-            background-color: #1D4ED8 !important;
-            transform: translateY(-1px) scale(1.03);
-            box-shadow: 0 10px 25px rgba(37, 99, 235, 0.5);
-        }
+    #     .stButton>button:hover {
+    #         background-color: #1D4ED8 !important;
+    #         transform: translateY(-1px) scale(1.03);
+    #         box-shadow: 0 10px 25px rgba(37, 99, 235, 0.5);
+    #     }
 
-        /* Text input styling (important to make it visible) */
-        .stTextInput > div > div > input,
-        .stTextArea textarea {
-            border-radius: 999px !important;
-            padding: 0.75rem 1rem !important;
-            border: 1px solid #1F2937 !important;
-            background-color: #020617 !important;
-            color: #E5E7EB !important;
-        }
+    #     /* Text input styling (important to make it visible) */
+    #     .stTextInput > div > div > input,
+    #     .stTextArea textarea {
+    #         border-radius: 999px !important;
+    #         padding: 0.75rem 1rem !important;
+    #         border: 1px solid #1F2937 !important;
+    #         background-color: #020617 !important;
+    #         color: #E5E7EB !important;
+    #     }
 
-        .stTextArea textarea {
-            border-radius: 12px !important;
-        }
+    #     .stTextArea textarea {
+    #         border-radius: 12px !important;
+    #     }
 
-        .stTextInput > div > div > input:focus,
-        .stTextArea textarea:focus {
-            border-color: #3B82F6 !important;
-            box-shadow: 0 0 0 1px #3B82F6 !important;
-            outline: none !important;
-        }
+    #     .stTextInput > div > div > input:focus,
+    #     .stTextArea textarea:focus {
+    #         border-color: #3B82F6 !important;
+    #         box-shadow: 0 0 0 1px #3B82F6 !important;
+    #         outline: none !important;
+    #     }
 
-        /* Selectbox styling */
-        .stSelectbox > div div[data-baseweb="select"] > div {
-            background-color: #020617 !important;
-            color: #E5E7EB !important;
-            border-radius: 999px !important;
-            border: 1px solid #1F2937 !important;
-        }
+    #     /* Selectbox styling */
+    #     .stSelectbox > div div[data-baseweb="select"] > div {
+    #         background-color: #020617 !important;
+    #         color: #E5E7EB !important;
+    #         border-radius: 999px !important;
+    #         border: 1px solid #1F2937 !important;
+    #     }
 
-        /* Animations */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+    #     /* Animations */
+    #     @keyframes fadeIn {
+    #         from { opacity: 0; transform: translateY(8px); }
+    #         to { opacity: 1; transform: translateY(0); }
+    #     }
 
-        /* Scrollbar tweak (dark) */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #020617;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #1F2937;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #374151;
-        }
-        </style>
-        """
-    else:
+    #     /* Scrollbar tweak (dark) */
+    #     ::-webkit-scrollbar {
+    #         width: 8px;
+    #     }
+    #     ::-webkit-scrollbar-track {
+    #         background: #020617;
+    #     }
+    #     ::-webkit-scrollbar-thumb {
+    #         background: #1F2937;
+    #         border-radius: 4px;
+    #     }
+    #     ::-webkit-scrollbar-thumb:hover {
+    #         background: #374151;
+    #     }
+    #     </style>
+    #     """
+    # else:
         return """
         <style>
         /* Global background and text */
@@ -235,16 +235,23 @@ st.markdown(load_theme(st.session_state.theme), unsafe_allow_html=True)
 st.sidebar.header("⚙️ Settings")
 
 # Theme toggle
-if st.sidebar.button(
-    "🌙 Dark Mode" if st.session_state.theme == "light" else "☀ Light Mode"
-):
-    st.session_state.theme = "light" if st.session_state.theme == "dark" else "dark"
-    st.rerun()
+# if st.sidebar.button(
+#     "🌙 Dark Mode" if st.session_state.theme == "light" else "☀ Light Mode"
+# ):
+#     st.session_state.theme = "light" if st.session_state.theme == "dark" else "dark"
+#     st.rerun()
 
 model_choice = st.sidebar.selectbox(
     "Choose LLM Model",
     ["deepseek", "gemma", "llama"]
 )
+
+embedding_model = st.sidebar.selectbox(
+    "Embedding Model",
+    ["all-MiniLM-L6-v2 (fast)", "all-mpnet-base-v2 (accurate)"]
+)
+
+print("embedding_model " + embedding_model)
 
 
 # ======================================================
@@ -405,7 +412,7 @@ if st.session_state.page == "chat":
             # Call backend
             try:
                 with st.spinner("✈️ Thinking..."):
-                    response = answer_question(user_msg, retrieval_mode)
+                    response = answer_question(user_msg, retrieval_mode, embedding_model)
             except Exception as e:
                 st.error(f"Backend Error: {str(e)}")
                 st.stop()
@@ -414,7 +421,7 @@ if st.session_state.page == "chat":
             st.session_state.last_debug = response
 
             # Save bot answer (based on selected model)
-            final_answer = response["model_comparison"][model_choice]["answer"]
+            final_answer = response.get("final_answer", "No answer generated.")
             st.session_state.chat_history.append({
                 "role": "assistant",
                 "content": final_answer
@@ -494,10 +501,12 @@ if st.session_state.page == "chat":
         with st.expander("📝 Structured Prompt Sent to LLM"):
             st.code(response.get("prompt_used", ""), language="markdown")
 
-        # --- Model Comparison ---
-        st.subheader("🤖 Model Comparisons")
-        for model_name, data in response["model_comparison"].items():
-            with st.expander(
-                f"Model: {model_name.upper()} (Latency: {data['latency_seconds']}s)"
-            ):
-                st.write(data["answer"])
+        # # --- Model Comparison ---
+        # st.subheader("🤖 Model Comparisons")
+        # for model_name, data in response["model_comparison"].items():
+        #     with st.expander(
+        #         f"Model: {model_name.upper()} (Latency: {data['latency_seconds']}s)"
+        #     ):
+        #         st.write(data["answer"])
+        st.caption(f"⏱ LLM latency: {response.get('latency_seconds')} seconds")
+

@@ -1,62 +1,36 @@
-import os
 from neo4j import GraphDatabase
+import os
 
+URI = os.environ.get("NEO4J_URI")
+USER = os.environ.get("USER_NAME")
+PASSWORD = os.environ.get("PASSWORD")
 
-def load_config():
-    uri = os.environ.get("NEO4J_URI")
-    user = os.environ.get("USER_NAME")
-    password = os.environ.get("PASSWORD")
+driver = GraphDatabase.driver(URI, auth=(USER, PASSWORD))
 
-    # Safety checks
-    missing = []
-    if uri is None: missing.append("NEO4J_URI")
-    if user is None: missing.append("USER_NAME")
-    if password is None: missing.append("PASSWORD")
+INDEXES = {
+    "journey_minilm_index": "embedding_minilm",
+    "journey_mpnet_index": "embedding_mpnet"
+}
 
-    if missing:
-        raise ValueError(f"❌ Missing environment variable(s): {', '.join(missing)}")
+DIMENSIONS = {
+    "embedding_minilm": 384,
+    "embedding_mpnet": 768
+}
 
-    return uri, user, password
-
-
-def create_journey_embedding_index():
-    """
-    Create a Neo4j vector index on Journey.embedding with dimension 4 and cosine similarity.
-    If it already exists, log and do nothing.
-    """
-    uri, user, password = load_config()
-    driver = GraphDatabase.driver(uri, auth=(user, password))
-
-    index_name = "journey_embedding_index"
-
-    check_query = """
-    SHOW INDEXES
-    YIELD name, type, entityType, labelsOrTypes, properties
-    WHERE name = $name
-    RETURN name
-    """
-
-    create_query = """
-    CALL db.index.vector.createNodeIndex(
-        $name,
-        'Journey',
-        'embedding',
-        4,
-        'cosine'
-    )
-    """
-
+def create_indexes():
     with driver.session() as session:
-        existing = session.run(check_query, name=index_name).single()
+        for index_name, prop in INDEXES.items():
+            session.run(f"""
+            CALL db.index.vector.createNodeIndex(
+                '{index_name}',
+                'Journey',
+                '{prop}',
+                {DIMENSIONS[prop]},
+                'cosine'
+            )
+            """)
 
-        if existing:
-            print(f"ℹ️ Vector index '{index_name}' already exists.")
-        else:
-            session.run(create_query, name=index_name)
-            print(f"✅ Created vector index '{index_name}' on Journey.embedding.")
-
-    driver.close()
-
+            print(f"✅ Created index {index_name}")
 
 if __name__ == "__main__":
-    create_journey_embedding_index()
+    create_indexes()

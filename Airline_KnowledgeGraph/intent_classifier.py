@@ -146,8 +146,7 @@ def classify_intent_llm(text: str) -> str:
     if "worst delay" in txt or "class has the worst" in txt:
       return "class_delay"
     
-    if "similar" in txt or "like" in txt or "closest" in txt:
-      return "journey_similarity"
+
 
 
 

@@ -1,71 +1,68 @@
 from neo4j import GraphDatabase
-import numpy as np
+from sentence_transformers import SentenceTransformer
 import os
 
+# ----------------------------------
+# CONFIG
+# ----------------------------------
+URI = os.environ.get("NEO4J_URI")
+USER = os.environ.get("USER_NAME")
+PASSWORD = os.environ.get("PASSWORD")
 
-def load_variables():
-    uri = os.environ.get("NEO4J_URI")
-    user = os.environ.get("USER_NAME")
-    password = os.environ.get("PASSWORD")
-    print(uri)
-    return uri, user, password
+MODELS = {
+    "minilm": "sentence-transformers/all-MiniLM-L6-v2",
+    "mpnet": "sentence-transformers/all-mpnet-base-v2"
+}
+
+driver = GraphDatabase.driver(URI, auth=(USER, PASSWORD))
 
 
-def l2_normalize(vec: np.ndarray) -> np.ndarray:
-    norm = np.linalg.norm(vec)
-    if norm == 0:
-        return vec
-    return vec / norm
+def build_journey_text(record):
+    return (
+        f"Journey {record['id']} with food satisfaction {record['food']}, "
+        f"arrival delay {record['delay']} minutes, "
+        f"distance {record['miles']} miles, "
+        f"number of legs {record['legs']}, "
+        f"class {record['cls']}"
+    )
 
 
-def generate_journey_embeddings():
-    """
-    For each Journey node, build a numerical feature vector based on journey metrics:
-      [food_satisfaction_score, arrival_delay_minutes, actual_flown_miles, number_of_legs]
-    Then L2-normalize it and store it in j.embedding (as a list of floats).
-    """
-    uri, user, password = load_variables()
-    driver = GraphDatabase.driver(uri, auth=(user, password))
-
+def generate_embeddings():
     query = """
     MATCH (j:Journey)
     RETURN
-        j.feedback_ID              AS id,
-        coalesce(j.food_satisfaction_score, 0.0) AS food,
-        coalesce(j.arrival_delay_minutes,   0.0) AS delay,
-        coalesce(j.actual_flown_miles,      0.0) AS miles,
-        coalesce(j.number_of_legs,          0.0) AS legs
+        j.feedback_ID AS id,
+        coalesce(j.food_satisfaction_score, 0) AS food,
+        coalesce(j.arrival_delay_minutes, 0) AS delay,
+        coalesce(j.actual_flown_miles, 0) AS miles,
+        coalesce(j.number_of_legs, 0) AS legs,
+        coalesce(j.passenger_class, 'Economy') AS cls
     """
 
     update_query = """
-    MATCH (j:Journey {feedback_ID: $id})
-    SET j.embedding = $embedding
+    MATCH (j:Journey {{feedback_ID: $id}})
+    SET j.embedding_{model} = $embedding
     """
 
     with driver.session() as session:
-        results = session.run(query)
+        rows = session.run(query).data()
 
-        count = 0
-        for record in results:
-            food = float(record["food"])
-            delay = float(record["delay"])
-            miles = float(record["miles"])
-            legs = float(record["legs"])
+        for model_key, model_name in MODELS.items():
+            print(f"🔹 Loading {model_name}")
+            model = SentenceTransformer(model_name)
 
-            vec = np.array([food, delay, miles, legs], dtype=float)
-            vec = l2_normalize(vec)
+            for r in rows:
+                text = build_journey_text(r)
+                emb = model.encode(text, normalize_embeddings=True).tolist()
 
-            session.run(
-                update_query,
-                id=record["id"],
-                embedding=vec.tolist()
-            )
-            count += 1
+                session.run(
+                    update_query.format(model=model_key),
+                    id=r["id"],
+                    embedding=emb
+                )
 
-        print(f"✅ Generated embeddings for {count} Journey nodes.")
-
-    driver.close()
+        print("✅ Embeddings generated for both models")
 
 
 if __name__ == "__main__":
-    generate_journey_embeddings()
+    generate_embeddings()
