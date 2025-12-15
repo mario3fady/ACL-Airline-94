@@ -501,12 +501,10 @@ if st.session_state.page == "chat":
         with st.expander("📝 Structured Prompt Sent to LLM"):
             st.code(response.get("prompt_used", ""), language="markdown")
 
-        # # --- Model Comparison ---
-        # st.subheader("🤖 Model Comparisons")
-        # for model_name, data in response["model_comparison"].items():
-        #     with st.expander(
-        #         f"Model: {model_name.upper()} (Latency: {data['latency_seconds']}s)"
-        #     ):
-        #         st.write(data["answer"])
+        # --- Model Summary ---
+        st.subheader("🤖 Model Summary")
+
         st.caption(f"⏱ LLM latency: {response.get('latency_seconds')} seconds")
+        st.caption(f"📏 Answer Length: {response.get('answer_length')} words")
+        st.caption(f"✅ KG Accuracy: {response.get('accuracy')}%")
 

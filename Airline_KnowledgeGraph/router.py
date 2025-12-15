@@ -6,6 +6,7 @@ from entity_extraction import extract_entities_llm
 from prompt_builder import build_structured_prompt
 from retrieval import Retriever
 from llm_models import run_llm
+from accuracy import compute_kg_faithfulness_accuracy
 
 
 # ----------------------------------------------------
@@ -184,8 +185,16 @@ def answer_question(user_question: str, retrieval_mode: str= "hybrid", embedding
     # -------------------------------
     llm_result = run_llm("deepseek", prompt)
 
+    accuracy = compute_kg_faithfulness_accuracy(
+            llm_result["answer"],
+            merged_list if merged_list else baseline_list
+        )
+    
+    accuracy = accuracy*100
+
     final_answer = llm_result["answer"]
     latency = llm_result["latency_seconds"]
+    answer_length = llm_result["answer_length"]
 
     # -------------------------------
     # Step 6: Return final object
@@ -201,5 +210,7 @@ def answer_question(user_question: str, retrieval_mode: str= "hybrid", embedding
         },
         "prompt_used": prompt,
         "final_answer": final_answer,
-        "latency_seconds": latency
+        "latency_seconds": latency,
+        "answer_length": answer_length,
+        "accuracy": accuracy
     }
